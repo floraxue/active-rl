@@ -1,0 +1,13 @@
+boto3
+pycurl
+lmdb
+dnspython
+stem
+pyyaml
+pillow
+ray
+boto3
+paramiko
+opencv-python
+reppy
+tensorboardX
