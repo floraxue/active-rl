@@ -10,6 +10,8 @@ import torchvision.transforms as transforms
 from dataset import ImageFolderWithPaths
 import time
 from pathlib import Path
+from util import logger
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -80,7 +82,7 @@ def extract_feats(args):
             outputs = feat_model(inputs)
             for j in range(inputs.size(0)):
                 path = paths[j]
-                outfile = path.replace('train', 'feat/train').replace('JPEG','npz')
+                outfile = path.replace('images', 'feats').replace('jpg','npz')
                 p = Path(outfile)
                 p.parent.mkdir(parents=True, exist_ok = True)
                 p.touch(exist_ok=True)
@@ -90,11 +92,13 @@ def extract_feats(args):
                 np.savez(outfile, out)
             batch_time.update(time.time() - end)
             end = time.time()
-            print(i)
+            logger.info("Finished batch {}/{}".format(i, len(loader)))
+
 
 def main():
     args = parse_arguments()
     extract_feats(args)
+
 
 if __name__ == '__main__':
     main()
