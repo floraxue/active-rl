@@ -92,9 +92,9 @@ def train_nsq(args, game, q_func):
             done_seq += [done]
 
             if len(act_seq) >= args.duration:
-                #Train the classifier
+                # Train the classifier
 
-                #TODO: to be replaced
+                # TODO: to be replaced
                 reward = 0
                 reward_seq += [reward]*len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
