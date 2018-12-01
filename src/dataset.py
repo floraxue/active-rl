@@ -4,6 +4,7 @@ import pickle
 from os.path import exists, join
 import numpy as np
 
+
 class ImageFolderWithPaths(datasets.ImageFolder):
     """Custom dataset that includes image file paths. Extends
     torchvision.datasets.ImageFolder
