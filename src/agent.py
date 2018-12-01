@@ -61,7 +61,6 @@ class NSQ(object):
         here we take a batch of next_state_batches and do the batch update
         """
 
-        # fixme: need to verify the dimensions
         # gather the last q values
         with torch.no_grad:
             next_max_q = self.target_q_function(next_state_batch).max(1)[0]

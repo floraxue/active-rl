@@ -83,31 +83,31 @@ def train_nsq(args, game, q_func):
         state_seq, act_seq, reward_seq = [], [], []
         next_state_seq, qvalue_seq, done_seq = [], [], []
         for t in count():
+            action, qvalue = robot.act(state)
+            reward, next_state, done = game.step(action)
+            state_seq += [state]
+            act_seq += [action]
+            next_state_seq += [next_state]
+            qvalue_seq += [qvalue]
+            done_seq += [done]
+
             if len(act_seq) >= args.duration:
+                #Train the classifier
+
+                #TODO: to be replaced
+                reward = 0
+                reward_seq += [reward]*len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
                             reward_seq, qvalue_seq, done_seq)
                 state_seq, act_seq, reward_seq = [], [], []
                 next_state_seq, qvalue_seq, done_seq = [], [], []
 
-            action, qvalue = robot.act(state)
-            reward, next_state, done = game.step(action)
-            state_seq += [state]
-            act_seq += [action]
-            reward_seq += [reward]
-            next_state_seq += [next_state]
-            qvalue_seq += [qvalue]
-            done_seq += [done]
-            state = next_state
+                #train agent
+                if len(memory) >= 5 * args.batch_size:
+                    _, _, next_state_batch, reward_batch, qvalue_batch, not_done_batch = memory.sample(args.batch_size)
+                    robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
 
-            # train model
-            if len(memory) < 5 * args.batch_size:
-                pass
-            else:
-                _, _, next_state_batch, reward_batch, qvalue_batch, \
-                    not_done_batch = memory.sample(args.batch_size)
-                # todo need to fix the type
-                robot.update(next_state_seq, reward_batch, qvalue_batch,
-                             not_done_batch)
+            state = next_state
 
             if done:
                 episode_durations.append(t+1)
