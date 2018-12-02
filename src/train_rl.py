@@ -39,6 +39,8 @@ def parse_arguments():
                         help='feature size')
     parser.add_argument('--save-every', type=int, default=1,
                         help='save the checkpoint every K episode')
+    parser.add_argument('--val_rate', type=float, default=0.2)
+    parser.add_argument('--test_rate', type=float, default=0.2)
     # flags for the game
     parser.add_argument('--eval-dir', type=str, default='',
                         help='path to the training list folder')
@@ -102,7 +104,7 @@ def train_nsq(args, game, q_func):
                 state_seq, act_seq, reward_seq = [], [], []
                 next_state_seq, qvalue_seq, done_seq = [], [], []
 
-                #train agent
+                # train agent
                 if len(memory) >= 5 * args.batch_size:
                     _, _, next_state_batch, reward_batch, qvalue_batch, not_done_batch = memory.sample(args.batch_size)
                     robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
@@ -111,6 +113,10 @@ def train_nsq(args, game, q_func):
 
             if done:
                 episode_durations.append(t+1)
+                # TODO
+                # validate_model(game.chosen_val)
+                # test_model(game.chosen_test)
+                # test_all_data()
                 break
 
         if i_episode % args.target_update == 0:

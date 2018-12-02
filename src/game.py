@@ -55,9 +55,25 @@ class VFGGAME:
         self.episode = 0
         self.terminal = False
 
+        # num for setting train val and test set
+        self.val_rate = args.val_rate
+        self.test_rate = args.test_rate
+        self.chosen_train = {
+            'key': [], 'gt': []}
+        self.chosen_val = {
+            'key': [], 'gt': []}
+        self.chosen_test = {
+            'key': [], 'gt': []}
+
     def reset(self, new_key_path):
         self.chosen = 0
         self.chosen_set = {
+            'key': [], 'gt': []}
+        self.chosen_train = {
+            'key': [], 'gt': []}
+        self.chosen_val = {
+            'key': [], 'gt': []}
+        self.chosen_test = {
             'key': [], 'gt': []}
         self.update = 0
         self.terminal = False
@@ -88,9 +104,19 @@ class VFGGAME:
             self.chosen_set['key'] += [self.current_sample.key]
             self.chosen_set['gt'] += [self.current_sample.label]
 
-            # if self.chosen % self.duration == 0 or self.chosen == self.budget:
-            #     self.update += 1
-            #     self.train_model()
+            if self.chosen % self.duration == 0 or self.chosen == self.budget:
+                curr_iter_num = self.chosen - ((self.chosen - 1) // self.duration) * self.duration
+                num_val = int(self.val_rate * curr_iter_num)
+                num_test = int(self.test_rate * curr_iter_num)
+                num_train = curr_iter_num - num_val - num_test
+                self.chosen_train['key'] = self.chosen_set['key'][:num_train]
+                self.chosen_train['gt'] = self.chosen_set['gt'][:num_train]
+                self.chosen_val['key'] = self.chosen_set['key'][num_train: num_train + num_val]
+                self.chosen_val['gt'] = self.chosen_set['gt'][num_train: num_train + num_val]
+                self.chosen_test['key'] = self.chosen_set['key'][-num_test:]
+                self.chosen_test['gt'] = self.chosen_set['gt'][-num_test:]
+                # self.update += 1
+                # self.train_model()
 
         # move to the next sample in the queue
         self.index += 1
