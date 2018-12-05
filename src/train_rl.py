@@ -4,6 +4,7 @@ import torch.optim as optim
 from itertools import count
 import argparse
 from os.path import join
+import pickle
 
 from .agent import NSQ
 from .policy import PolicyNet
@@ -64,6 +65,16 @@ def fixed_set_evaluation():
     fixed_set_dir = '/data/active-rl-data/data/images/test/cat'
     # TODO
     pass
+
+
+def calculate_reward():
+    # TODO set work dir from param
+    lsun_file = join(work_dir, 'fixed_set_acc_LSUN.p')
+    rl_file = join(work_dir, 'fixed_set_acc_RL.p')
+    lsun_acc = pickle.load(open(lsun_file, 'rb'))
+    rl_acc = pickle.load(open(rl_file, 'rb'))
+    acc_gain = rl_acc - lsun_acc
+    return acc_gain
 
 
 def test_all_data():
@@ -137,6 +148,7 @@ def train_nsq(args, game, q_func):
                 fixed_set_evaluation()
 
                 # TODO: read reward from difference from LSUN
+
                 reward = 0
                 game.current_reward = reward
                 logger.info('current reward in update {} of episode {} is {}'.format(

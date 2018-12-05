@@ -559,7 +559,7 @@ def test_fixed_set(args):
     overall_acc = overall_correct / len(keys)
     mode = env.mode()
     logger.info("env mode is {}".format(mode))
-    out_file = join(work_dir, 'fix_set_acc.p')
+    out_file = join(work_dir, 'fixed_set_acc_{}.p'.format(mode))
     pickle.dump(overall_acc, open(out_file, 'wb'))
     return overall_acc
 
