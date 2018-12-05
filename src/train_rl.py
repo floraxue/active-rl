@@ -3,17 +3,19 @@ import torch.optim as optim
 
 from itertools import count
 import argparse
+from os.path import join
 
 from .agent import NSQ
 from .policy import PolicyNet
 from .buffer import ReplayMemory
 from .game import VFGGAME
 from .explorer import Explorer
+from util import logger
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
-    parser.add_argument('--category', type=str, default='cat1',
+    parser.add_argument('--category', type=str, default='cat',
                         help='image category')
     parser.add_argument('--budget', type=int, default=10000,
                         help='maximum number of examples for human annotation')
@@ -46,9 +48,27 @@ def parse_arguments():
                         help='path to the training list folder')
     parser.add_argument('--train-prefix', type=str, default='train',
                         help='prefix of the training files')
+    parser.add_argument('--key-path', type=str,
+                        help='key path for the unknown data set')
 
     args = parser.parse_args()
     return args
+
+
+def test_model():
+    # TODO
+    pass
+
+
+def fixed_set_evaluation():
+    fixed_set_dir = '/data/active-rl-data/data/images/test/cat'
+    # TODO
+    pass
+
+
+def test_all_data():
+    # TODO
+    pass
 
 
 def train_nsq(args, game, q_func):
@@ -71,8 +91,22 @@ def train_nsq(args, game, q_func):
                 gamma=args.gamma, num_actions=num_actions)
 
     episode_durations = []
-    for i_episode in range(args.episodes):
-        game.reset()
+
+    # Pipeline params
+    category = args.category
+    # Set initial unsure key path
+    train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
+        category, game.episode, game.update)
+    work_root = '/data/active-rl-data/classifier'
+    work_dir = join(work_root, 'initial')
+    save_dir = join(work_dir, 'snapshots')
+    new_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, 0))
+
+    for i_episode in range(1, args.episodes + 1):
+        game.reset(new_key_path)
+
+        # pipeline param
+        trial = i_episode
 
         # this is to reset the hidden units, not repackage the variables
         robot.q_function.reset_hidden()
@@ -93,11 +127,20 @@ def train_nsq(args, game, q_func):
             qvalue_seq += [qvalue]
             done_seq += [done]
 
-            if len(act_seq) >= args.duration:
+            if action > 0 and (game.chosen % game.duration == 0
+                               or game.chosen == game.budget):
                 # Train the classifier
+                game.train_model()
+                test_model()
 
-                # TODO: to be replaced
+                # Evaluate on fixed set
+                fixed_set_evaluation()
+
+                # TODO: read reward from difference from LSUN
                 reward = 0
+                game.current_reward = reward
+                logger.info('current reward in update {} of episode {} is {}'.format(
+                            game.update, game.episode, game.current_rewared))
                 reward_seq += [reward]*len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
                             reward_seq, qvalue_seq, done_seq)
@@ -114,9 +157,15 @@ def train_nsq(args, game, q_func):
             if done:
                 episode_durations.append(t+1)
                 # TODO
-                # validate_model(game.chosen_val)
-                # test_model(game.chosen_test)
-                # test_all_data()
+                test_all_data()
+
+                # Set new key path
+                train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
+                    category, game.episode, game.update)
+                work_root = '/data/active-rl-data/classifier'
+                work_dir = join(work_root, train_prefix)
+                save_dir = join(work_dir, 'snapshots')
+                new_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, trial))
                 break
 
         if i_episode % args.target_update == 0:

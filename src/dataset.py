@@ -3,6 +3,7 @@ from torch.utils import data
 import pickle
 from os.path import exists, join
 import numpy as np
+from PIL import Image
 
 
 class ImageFolderWithPaths(datasets.ImageFolder):
@@ -34,6 +35,27 @@ class FeatDataset(data.Dataset):
         feat_path = join(self.feat_dir, key + '.npz')
         feat = np.load(feat_path)
         return feat, target, key
+
+    def __len__(self):
+        return len(self.keys)
+
+
+class ImageData(data.Dataset):
+    def __init__(self, key_path, image_dir, gt_path, transform=None):
+        assert exists(key_path) and exists(image_dir) and exists(gt_path)
+        self.keys = pickle.load(open(key_path, 'rb'))
+        self.gts = pickle.load(open(gt_path, 'rb'))
+        self.image_dir = image_dir
+        self.transform = transform
+
+    def __getitem__(self, index):
+        key = self.keys[index]
+        target = self.gts[key]
+        image_path = join(self.image_dir, key + '.jpg')
+        image = Image.open(image_path).convert('RGB')
+        if self.transform:
+            image = self.transform(image)
+        return image, target, key
 
     def __len__(self):
         return len(self.keys)

@@ -6,7 +6,8 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import time
 import argparse
-from ..common.data_loader import ImageData
+from dataset import ImageData
+import network
 from util import logger, softmax
 from env_obj import Env
 import os
@@ -16,25 +17,28 @@ import pdb
 import torch.nn.functional as F
 import numpy as np
 import json
+import pickle
 
 
 env = Env()
+IMAGE_DIR = '/data/active-rl-data/data/images/train/cat'
+GT_PATH = '/data/active-rl-data/ground_truth/cat_gt_cached.p'
 
 
 def args_parser():
     parser = argparse.ArgumentParser(description='Pytorch training')
     parser.add_argument('cmd', type=str, choices=['train', 'test', 'test_all'])
-    parser.add_argument('--train-dir', '-t', metavar='DIR',
+    parser.add_argument('--train-keys', '-t', metavar='DIR',
                         help='path to training dataset')
-    parser.add_argument('--eval-dir', '-e', metavar='DIR',
+    parser.add_argument('--eval-keys', '-e', metavar='DIR',
                         help='path to eval datasets')
     parser.add_argument('--save-dir', '-s', metavar='DIR', help='save dir')
     parser.add_argument('--method', '-m', metavar='ARCH', default='resnet',
                         help='model architecture:')
     parser.add_argument('--category', '-ct', default='cat1', type=str,
                         help='category')
-    parser.add_argument('--trial-prefix', '-tp', default='', type=str,
-                        help='trial prefix')
+    parser.add_argument('--train-prefix', '-tp', default='', type=str,
+                        help='train prefix')
     parser.add_argument('--trial', '-tt', default=0, type=int,
                         help='current trial id')
     parser.add_argument('--stage', '-st', default=0, type=int,
@@ -85,18 +89,18 @@ def train(args):
         transforms.ToTensor(),
         normalize])
     logger.info('creating train/val data loader')
-    train_prefix = args.trial_prefix + '_train'
+    # train_prefix = args.train_prefix + '_train'
     train_loader = data.DataLoader(
-        ImageData(args.train_dir, train_prefix, args.category,
+        ImageData(args.train_keys, IMAGE_DIR, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=True, pin_memory=True)
-    val_loader = data.DataLoader(
-        ImageData(args.eval_dir, 'val', args.category, transform=trans),
-        batch_size=args.batch_size,
-        num_workers=args.num_workers, shuffle=False, pin_memory=True)
+    # val_loader = data.DataLoader(
+    #     ImageData(args.eval_keys, IMAGE_DIR, GT_PATH, transform=trans),
+    #     batch_size=args.batch_size,
+    #     num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
     val_bal_loader = data.DataLoader(
-        ImageData(args.eval_dir, 'val_bal', args.category, transform=trans),
+        ImageData(args.eval_dir, IMAGE_DIR, GT_PATH, transform=trans),
         batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
     logger.info('finished creating data loaders')
@@ -106,7 +110,7 @@ def train(args):
     optimizer = torch.optim.SGD(optim_params, args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
-    best_prec1_raw = 0
+    # best_prec1_raw = 0
     best_prec1_bal = 0
 
     batch_time = AverageMeter()
@@ -161,13 +165,13 @@ def train(args):
 
             if (i+1) % args.eval_every == 0 or (i+1) == args.iters:
                 # evaluation
-                prec1_raw = validate(args, val_loader, model, criterion, i)
-                prec1_bal = validate(args, val_bal_loader, model, criterion, i)
+                # prec1_raw = validate(args.print_freq, val_loader, model, criterion, i)
+                prec1_bal = validate(args.print_freq, val_bal_loader, model, criterion, i)
 
-                is_best_raw = prec1_raw > best_prec1_raw
+                # is_best_raw = prec1_raw > best_prec1_raw
                 is_best_bal = prec1_bal > best_prec1_bal
 
-                best_prec1_raw = max(prec1_raw, best_prec1_raw)
+                # best_prec1_raw = max(prec1_raw, best_prec1_raw)
                 best_prec1_bal = max(prec1_bal, best_prec1_bal)
 
                 checkpoint_path = join(args.save_dir,
@@ -176,9 +180,11 @@ def train(args):
                     'iters': i + 1,
                     'arch': args.method,
                     'state_dict': model.state_dict(),
-                    'best_prec1': [best_prec1_raw, best_prec1_bal],
+                    # 'best_prec1': [best_prec1_raw, best_prec1_bal],
+                    'best_prec1': [best_prec1_bal],
                     'optimizer': optimizer.state_dict(),
-                }, [is_best_raw, is_best_bal], filename=checkpoint_path)
+                # }, [is_best_raw, is_best_bal], filename=checkpoint_path)
+                }, [is_best_bal], filename=checkpoint_path)
                 history_path = join(
                     args.save_dir,
                     'checkpoint_{:05d}.pth.tar'.format(i + 1))
@@ -193,9 +199,9 @@ def train(args):
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     dirname = os.path.dirname(filename)
-    if is_best[0]:  # raw data
-        shutil.copyfile(filename, join(dirname, 'raw_model_best.pth.tar'))
-    if is_best[1]:  # bal data
+    # if is_best[0]:  # raw data
+    #     shutil.copyfile(filename, join(dirname, 'raw_model_best.pth.tar'))
+    if is_best[0]:  # bal data
         shutil.copyfile(filename, join(dirname, 'bal_model_best.pth.tar'))
 
 
@@ -250,12 +256,12 @@ def accuracy(output, target, topk=(1,)):
         return res
 
 
-def validate(args, val_loader, model, criterion, _iter, for_test=False):
+def validate(print_freq, val_loader, model, criterion, _iter, for_test=False):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
 
-    scores, labels, keys, dbs = [], [], [], []
+    scores, labels, keys = [], [], []
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # switch to evaluate mode
     model = model.to(device)
@@ -263,7 +269,7 @@ def validate(args, val_loader, model, criterion, _iter, for_test=False):
 
     with torch.no_grad():
         end = time.time()
-        for i, (input, target, key, db) in enumerate(val_loader):
+        for i, (input, target, key) in enumerate(val_loader):
             # target = target.cuda(non_blocking=True)
             input = input.to(device)
             target = target.to(device)
@@ -284,14 +290,13 @@ def validate(args, val_loader, model, criterion, _iter, for_test=False):
                 score = softmax_[:, 1]
                 scores.append(score)
                 keys += key
-                dbs += db
                 labels.append(target)
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % args.print_freq == 0:
+            if i % print_freq == 0:
                 logger.info('Val: [{0}/{1}]\t'
                             'Time {batch_time.val:.3f} '
                             '({batch_time.avg:.3f})\t'
@@ -306,7 +311,7 @@ def validate(args, val_loader, model, criterion, _iter, for_test=False):
     if for_test:
         scores = torch.cat(scores)
         labels = torch.cat(labels)
-        return top1.avg, scores, keys, labels, dbs
+        return top1.avg, scores, keys, labels
     else:
         return top1.avg
 
@@ -332,14 +337,15 @@ def test(args):
     # the first stage will be using the full test data and for the later
     # stages, use the unknown part of the data for testing
     test_loader = data.DataLoader(
-        ImageData(args.eval_dir, args.test_prefix, args.category,
+        ImageData(args.eval_keys, IMAGE_DIR, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
 
     # find the split
-    test_names = ['raw', 'bal']
+    # test_names = ['raw', 'bal']
+    test_names = ['bal']
     split_results = []
     accuracies = []
     work_dir = os.path.dirname(args.save_dir)
@@ -350,8 +356,8 @@ def test(args):
         model.load_state_dict(checkpoint['state_dict'])
         iteration = checkpoint['iters']
 
-        prec1, scores, keys, labels, dbs = validate(
-            args, test_loader, model, criterion, iteration, for_test=True)
+        prec1, scores, keys, labels = validate(
+            args.print_freq, test_loader, model, criterion, iteration, for_test=True)
 
         accuracies.append(prec1.item())
         test_labels = np.array(labels)
@@ -408,7 +414,7 @@ def test(args):
         out_path = join(work_dir, 'test_predictions_{}_{}.txt'.format(
             tn, iteration))
         with open(out_path, 'w') as fp:
-            print('key,label,prediction,score,db', file=fp)
+            print('key,label,prediction,score', file=fp)
             for i in range(len(keys)):
                 index = order[i]
                 p = int(test_scores[index] > pos_thresh) + \
@@ -417,7 +423,7 @@ def test(args):
                 if tar == 0:
                     tar = -1
                 print(keys[index], tar, p, test_scores[index],
-                      dbs[index], sep=',', file=fp)
+                      sep=',', file=fp)
 
         split_results.append(result)
 
@@ -446,48 +452,116 @@ def test(args):
         os.remove(out_model_link)
     os.symlink(model_path, out_model_link)
 
-    if env.mode() != 'LSUN':
-        pred_path = join(work_dir, 'test_predictions_{}_{}.txt'.format(
-            best_split['name'], best_split['iteration']))
-        test_keys = [[] for _ in range(3)]
-        test_gts = [[] for _ in range(3)]
-        test_dbs = [[] for _ in range(3)]
-        with open(pred_path, 'r') as fp:
-            for line in fp:
-                fields = line.split(',')
-                try:
-                    score = float(fields[3].strip())
-                except Exception:
-                    continue
-                label = int(score > best_split['posThresh']) \
-                    + int(score > best_split['negThresh'])
-                test_keys[label].append(fields[0])
-                test_gts[label].append(fields[1])
-                test_dbs[label].append(fields[-1])
+    # if env.mode() != 'LSUN':
+    #     pred_path = join(work_dir, 'test_predictions_{}_{}.txt'.format(
+    #         best_split['name'], best_split['iteration']))
+    #     test_keys = [[] for _ in range(3)]
+    #     test_gts = [[] for _ in range(3)]
+    #     test_dbs = [[] for _ in range(3)]
+    #     with open(pred_path, 'r') as fp:
+    #         for line in fp:
+    #             fields = line.split(',')
+    #             try:
+    #                 score = float(fields[3].strip())
+    #             except Exception:
+    #                 continue
+    #             label = int(score > best_split['posThresh']) \
+    #                 + int(score > best_split['negThresh'])
+    #             test_keys[label].append(fields[0])
+    #             test_gts[label].append(fields[1])
+    #             test_dbs[label].append(fields[-1])
+    #
+    #     trials = [int(t) for t in args.trial_prefix.split('_')[1:]]
+    #
+    #     for i in range(3):
+    #         key_path = env.label_result_key_path(
+    #             args.category, args.stage, trials, i, prefix='test')
+    #         gt_path = env.label_result_gt_path(
+    #             args.category, args.stage, trials, i, prefix='test')
+    #         db_path = env.label_result_db_path(
+    #             args.category, args.stage, trials, i, prefix='test')
+    #         logger.info('Writing %s', key_path)
+    #         with open(key_path, 'w') as fp:
+    #             for k in test_keys[i]:
+    #                 print(k, file=fp)
+    #         logger.info('Writing %s', gt_path)
+    #         with open(gt_path, 'w') as fp:
+    #             for k, g in zip(test_keys[i], test_gts[i]):
+    #                 print(k.strip() + ' ' + g, file=fp)
+    #         logger.info('Writing %s', db_path)
+    #         with open(db_path, 'w') as fp:
+    #             for k in test_dbs[i]:
+    #                 print(k.strip(), file=fp)
+    #     logger.info('# images: %d %d %d', len(test_keys[0]), len(test_keys[1]),
+    #                 len(test_keys[2]))
 
-        trials = [int(t) for t in args.trial_prefix.split('_')[1:]]
 
-        for i in range(3):
-            key_path = env.label_result_key_path(
-                args.category, args.stage, trials, i, prefix='test')
-            gt_path = env.label_result_gt_path(
-                args.category, args.stage, trials, i, prefix='test')
-            db_path = env.label_result_db_path(
-                args.category, args.stage, trials, i, prefix='test')
-            logger.info('Writing %s', key_path)
-            with open(key_path, 'w') as fp:
-                for k in test_keys[i]:
-                    print(k, file=fp)
-            logger.info('Writing %s', gt_path)
-            with open(gt_path, 'w') as fp:
-                for k, g in zip(test_keys[i], test_gts[i]):
-                    print(k.strip() + ' ' + g, file=fp)
-            logger.info('Writing %s', db_path)
-            with open(db_path, 'w') as fp:
-                for k in test_dbs[i]:
-                    print(k.strip(), file=fp)
-        logger.info('# images: %d %d %d', len(test_keys[0]), len(test_keys[1]),
-                    len(test_keys[2]))
+def test_fixed_set(args):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = network.__dict__[args.method]()
+    model = torch.nn.DataParallel(model).to(device)
+    model.eval()
+    logger.info('model {} has been initialized'.format(args.method))
+
+    mean = np.array([0.49911337, 0.46108112, 0.42117174])
+    std = np.array([0.29213443, 0.2912565, 0.2954716])
+
+    normalize = transforms.Normalize(mean=mean, std=std)
+    trans = transforms.Compose([
+        transforms.RandomResizedCrop(args.crop_size),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        normalize])
+
+    # data loader
+    test_loader = data.DataLoader(
+        ImageData(args.eval_keys, IMAGE_DIR, GT_PATH,
+                  transform=trans), batch_size=args.batch_size,
+        num_workers=args.num_workers, shuffle=False, pin_memory=True)
+
+    criterion = nn.CrossEntropyLoss().to(device)
+
+    # run on the fixed set
+    work_dir = os.path.dirname(args.save_dir)
+    model_file = join(work_dir, 'split_model.pth.tar')
+    checkpoint = torch.load(model_file)
+    model.load_state_dict(checkpoint['state_dict'])
+    _iter = checkpoint['iters']
+    logger.info('loaded model {} at iteration {}'.format(args.method, _iter))
+
+    split_file = join(work_dir, 'split.json')
+    with open(split_file, 'r') as fp:
+        split_info = json.load(fp)
+
+    pos_thresh = split_info['posThresh']
+    neg_thresh = split_info['negThresh']
+
+    prec1, scores, keys, labels = validate(
+        args.print_freq, test_loader, model, criterion, _iter, for_test=True)
+
+    test_labels = np.array(labels)
+    test_scores = np.array(scores)
+
+    overall_correct = 0
+
+    for index in range(len(keys)):
+        # p = 0 negative, p = 2 positive
+        p = int(test_scores[index] > pos_thresh) + \
+            int(test_scores[index] > neg_thresh)
+        tar = int(test_labels[index])
+        if tar == -1:
+            tar = 0
+        if tar == 1:
+            tar = 2
+        if p == tar:
+            overall_correct += 1
+
+    overall_acc = overall_correct / len(keys)
+    mode = env.mode()
+    logger.info("env mode is {}".format(mode))
+    out_file = join(work_dir, 'fix_set_acc.p')
+    pickle.dump(overall_acc, open(out_file, 'wb'))
+    return overall_acc
 
 
 def test_all(args):
@@ -496,7 +570,9 @@ def test_all(args):
     model = torch.nn.DataParallel(model).to(device)
     model.eval()
 
-    checkpoint = torch.load(args.model_file)
+    work_dir = os.path.dirname(args.save_dir)
+    model_file = join(work_dir, 'split_model.pth.tar')
+    checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
     _iter = checkpoint['iters']
     logger.info('loaded model {} at iteration {}'.format(args.method, _iter))
@@ -518,84 +594,39 @@ def test_all(args):
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
-    work_dir = os.path.dirname(args.save_dir)
-    result_dir = join(work_dir, 'split_results')
-    os.makedirs(result_dir, exist_ok=True)
+    # result_dir = join(work_dir, 'split_results')
+    # os.makedirs(result_dir, exist_ok=True)
     split_file = join(work_dir, 'split.json')
     with open(split_file, 'r') as fp:
         split_info = json.load(fp)
 
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
-    label_dir = env.label_dir(args.category)
+    # label_dir = env.label_dir(args.category)
+    # TODO need to setup args properly with episode
     category = args.category
-    stage = args.stage
-    trials = [int(t) for t in args.trial_prefix.split('_')[1:]]
+    trial = args.trial
 
-    out_file = join(result_dir, args.test_prefix+'_score.txt')
-    if exists(out_file):
-        os.remove(out_file)
-        logger.info('delete existing out_file {}'.format(out_file))
-
-    for i in range(3):
-        key_path = env.label_result_key_path(category, stage, trials, i)
-        db_path = env.label_result_db_path(category, stage, trials, i)
-        gt_path = env.label_result_gt_path(category, stage, trials, i)
-        if exists(key_path):
-            os.remove(key_path)
-            logger.info('remove existing key_path {}'.format(key_path))
-        if exists(db_path):
-            os.remove(db_path)
-            logger.info('remove existing db_path {}'.format(db_path))
-        if exists(gt_path):
-            os.remove(gt_path)
-            logger.info('remove existing gt_path {}'.format(gt_path))
-
-    img_cnt = [0, 0, 0]
-
-    def write2file(keys, scores, labels, dbs):
-        split_keys = [[] for _ in range(3)]
-        split_dbs = [[] for _ in range(3)]
-        split_gts = [[] for _ in range(3)]
-        with open(out_file, 'a') as fp:
-            for ii in range(len(keys)):
-                k = keys[ii]
-                print(k, scores[ii].item(), labels[ii].item(), dbs[ii],
-                      sep=',', file=fp)
-                score = float(scores[ii].item())
-                lab = int(score < pos_thresh) + int(score > neg_thresh)
-                split_keys[lab].append(k)
-                split_dbs[lab].append(dbs[ii])
-                tar = int(labels[ii].item())
-                if tar == 0:
-                    tar = -1
-                split_gts[lab].append(str(tar))
-
-        for jj in range(3):
-            key_path = env.label_result_key_path(category, stage, trials, jj)
-            db_path = env.label_result_db_path(category, stage, trials, jj)
-            gt_path = env.label_result_gt_path(category, stage, trials, jj)
-            logger.info('Writing %s', key_path)
-            with open(key_path, 'a') as fp:
-                for k in split_keys[jj]:
-                    print(k, file=fp)
-
-            logger.info('Writing %s', db_path)
-            with open(db_path, 'a') as fp:
-                for d in split_dbs[jj]:
-                    print(d, file=fp)
-
-            logger.info('Writing %s', gt_path)
-            with open(gt_path, 'a') as fp:
-                for k, g in zip(split_keys[jj], split_gts[jj]):
-                    print(k + ' ' + g, file=fp)
-            img_cnt[jj] += len(split_keys[jj])
+    # out_file = join(result_dir, args.test_prefix+'_score.txt')
+    # if exists(out_file):
+    #     os.remove(out_file)
+    #     logger.info('delete existing out_file {}'.format(out_file))
+    #
+    # for i in range(3):
+    #     key_path = env.label_result_key_path(category, stage, trials, i)
+    #     gt_path = env.label_result_gt_path(category, stage, trials, i)
+    #     if exists(key_path):
+    #         os.remove(key_path)
+    #         logger.info('remove existing key_path {}'.format(key_path))
+    #     if exists(gt_path):
+    #         os.remove(gt_path)
+    #         logger.info('remove existing gt_path {}'.format(gt_path))
 
     batch_time = AverageMeter()
-    scores, keys, dbs, labels = [], [], [], []
+    scores, keys, labels = [], [], []
     with torch.no_grad():
         end = time.time()
-        for i,  (input, target, key, db) in enumerate(test_loader):
+        for i,  (input, target, key) in enumerate(test_loader):
             input = input.to(device)
             output, _ = model(input)
             softmax_ = F.softmax(output, dim=-1)
@@ -605,7 +636,6 @@ def test_all(args):
             score = softmax_[:, 1]
             scores.append(score)
             keys += key
-            dbs += db
             labels.append(target)
 
             # measure elapsed time
@@ -617,22 +647,67 @@ def test_all(args):
                             'batch time = {bt.val:.3f}s '
                             '({bt.avg:.3f})s'.format(
                                 i, len(test_loader), bt=batch_time))
-            if (i+1) % 100 == 0 or (i+1) == len(test_loader):
-                logger.info('[{}] Writing {}'.format((i+1)//100, out_file))
-                scores = torch.cat(scores)
-                labels = torch.cat(labels)
-                write2file(keys, scores, labels, dbs)
-                logger.info('write to file and release memory')
-                scores, keys, dbs, labels = [], [], [], []
+            # if (i+1) % 100 == 0 or (i+1) == len(test_loader):
+            #     logger.info('[{}] Writing {}'.format((i+1)//100, out_file))
+            #     scores = torch.cat(scores)
+            #     labels = torch.cat(labels)
+            #     write2file(keys, scores, labels)
+            #     logger.info('write to file and release memory')
+            #     scores, keys, labels = [], [], []
 
     logger.info('finish evaluation all data with prefix {}'.format(
         args.test_prefix))
 
-    out_split_path = env.label_result_info_path(category, stage, trials)
-    logger.info('Moving split info %s', out_split_path)
-    shutil.copyfile(split_file, out_split_path)
-    logger.info('# images: %d %d %d',
-                img_cnt[0], img_cnt[1], img_cnt[2])
+    # Write to file
+    split_keys = [[] for _ in range(3)]
+    split_gts = [[] for _ in range(3)]
+    out_pos_path = join(work_dir, '{}_trial_{}_pos.txt'.format(category, trial))
+    out_unsure_path = join(work_dir, '{}_trial_{}_unsure.txt'.format(category, trial))
+    out_unsure_pickle = join(work_dir, '{}_trial_{}_unsure.p'.format(category, trial))
+    out_neg_path = join(work_dir, '{}_trial_{}_neg.txt'.format(category, trial))
+    for i in range(len(keys)):
+        k = keys[i]
+        score = float(scores[i].item())
+        lab = int(score > pos_thresh) + int(score > neg_thresh)
+        split_keys[lab].append(k)
+        tar = int(labels[i].item())
+        if tar == 0:
+            tar = -1
+        split_gts[lab].append(str(tar))
+
+    with open(out_pos_path, 'w') as fp:
+        for k in split_keys[2]:
+            fp.write(k + '\n')
+    with open(out_unsure_path, 'w') as fp:
+        for k in split_keys[1]:
+            fp.write(k + '\n')
+    with open(out_neg_path, 'w') as fp:
+        for k in split_keys[0]:
+            fp.write(k + '\n')
+    with open(out_unsure_pickle, 'wb') as fp:
+        pickle.dump(split_keys[1], fp)
+
+    logger.info("finished writing results for current test all")
+
+    # for jj in range(3):
+    #     key_path = env.label_result_key_path(category, stage, trials, jj)
+    #     gt_path = env.label_result_gt_path(category, stage, trials, jj)
+    #     logger.info('Writing %s', key_path)
+    #     with open(key_path, 'a') as fp:
+    #         for k in split_keys[jj]:
+    #             print(k, file=fp)
+    #
+    #     logger.info('Writing %s', gt_path)
+    #     with open(gt_path, 'a') as fp:
+    #         for k, g in zip(split_keys[jj], split_gts[jj]):
+    #             print(k + ' ' + g, file=fp)
+    #     img_cnt[jj] += len(split_keys[jj])
+
+    # out_split_path = env.label_result_info_path(category, stage, trials)
+    # logger.info('Moving split info %s', out_split_path)
+    # shutil.copyfile(split_file, out_split_path)
+    # logger.info('# images: %d %d %d',
+    #             img_cnt[0], img_cnt[1], img_cnt[2])
 
 
 if __name__ == '__main__':

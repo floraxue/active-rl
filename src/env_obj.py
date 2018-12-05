@@ -56,7 +56,7 @@ class Env(object):
             m = os.environ['MODE']
             logger.info('running with mode {}'.format(m))
         except KeyError:
-            m = 'ITER'
+            m = 'RL'
             logger.info('No MODE is defined. Use default mode {}'.format(m))
         return m
 

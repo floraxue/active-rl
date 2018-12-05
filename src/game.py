@@ -9,6 +9,7 @@ import os
 from os.path import join, exists
 from util import logger
 from dataset import FeatDataset
+import pickle
 
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 
@@ -44,8 +45,7 @@ class VFGGAME:
         self.duration = args.duration
         # count the number of chosen samples
         self.chosen = 0
-        self.chosen_set = {
-            'key': [], 'gt': []}
+        self.chosen_set = {'key': [], 'gt': []}
         self.update = 0
 
         # holder for the current feature
@@ -58,23 +58,16 @@ class VFGGAME:
         # num for setting train val and test set
         self.val_rate = args.val_rate
         self.test_rate = args.test_rate
-        self.chosen_train = {
-            'key': [], 'gt': []}
-        self.chosen_val = {
-            'key': [], 'gt': []}
-        self.chosen_test = {
-            'key': [], 'gt': []}
+        self.chosen_train = {'key': [], 'gt': []}
+        self.chosen_val = {'key': [], 'gt': []}
+        self.chosen_test = {'key': [], 'gt': []}
 
     def reset(self, new_key_path):
         self.chosen = 0
-        self.chosen_set = {
-            'key': [], 'gt': []}
-        self.chosen_train = {
-            'key': [], 'gt': []}
-        self.chosen_val = {
-            'key': [], 'gt': []}
-        self.chosen_test = {
-            'key': [], 'gt': []}
+        self.chosen_set = {'key': [], 'gt': []}
+        self.chosen_train = {'key': [], 'gt': []}
+        self.chosen_val = {'key': [], 'gt': []}
+        self.chosen_test = {'key': [], 'gt': []}
         self.update = 0
         self.terminal = False
         self.episode += 1
@@ -109,12 +102,12 @@ class VFGGAME:
                 num_val = int(self.val_rate * curr_iter_num)
                 num_test = int(self.test_rate * curr_iter_num)
                 num_train = curr_iter_num - num_val - num_test
-                self.chosen_train['key'] = self.chosen_set['key'][:num_train]
-                self.chosen_train['gt'] = self.chosen_set['gt'][:num_train]
-                self.chosen_val['key'] = self.chosen_set['key'][num_train: num_train + num_val]
-                self.chosen_val['gt'] = self.chosen_set['gt'][num_train: num_train + num_val]
-                self.chosen_test['key'] = self.chosen_set['key'][-num_test:]
-                self.chosen_test['gt'] = self.chosen_set['gt'][-num_test:]
+                self.chosen_train['key'] += self.chosen_set['key'][:num_train]
+                self.chosen_train['gt'] += self.chosen_set['gt'][:num_train]
+                self.chosen_val['key'] += self.chosen_set['key'][num_train: num_train + num_val]
+                self.chosen_val['gt'] += self.chosen_set['gt'][num_train: num_train + num_val]
+                self.chosen_test['key'] += self.chosen_set['key'][-num_test:]
+                self.chosen_test['gt'] += self.chosen_set['gt'][-num_test:]
                 # self.update += 1
                 # self.train_model()
 
@@ -124,35 +117,95 @@ class VFGGAME:
 
         return self.current_reward, next_state, self.terminal
 
-    # def train_model(self):
-    #     self.write_list()
-    #     category = self.category
-    #     train_dir = env.category_rl_dir(category)
-    #     train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
-    #         category, self.episode, self.update)
-    #
-    #     save_dir = join(train_dir, 'snapshots')
-    #     os.makedirs(save_dir, exist_ok=True)
-    #     eval_dir = env.category_split_dir(category)
-    #     method = 'resnet'
-    #
-    #     if self.terminal:
-    #         iters = 15000
-    #     else:
-    #         iters = 5000
-    #
-    #     cmd = 'python3 -m vfg.label.train_new trian -t {0} -e {1} -s {2} ' \
-    #           '-m {3} --category {4} --iters {5} --train-prefix {6}'.format(
-    #             train_dir, eval_dir, save_dir, method, category, iters,
-    #             train_prefix)
-    #
-    #     output = subprocess.check_output(cmd, shell=True,
-    #                                      stderr=subprocess.STDOUT)
-    #
-    #     self.current_reward = float(output.decode('utf-8'))
-    #     logger.info('current reward in update {} of episode {} is {}'.format(
-    #         self.update, self.episode, self.current_reward))
-    #
+    def train_model(self):
+        # self.write_list()
+        category = self.category
+        train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
+            category, self.episode, self.update)
+        work_root = '/data/active-rl-data/classifier'
+        work_dir = join(work_root, train_prefix)
+
+        train_keys_path = join(work_dir, 'loader', 'train_keys.p')
+        val_keys_path = join(work_dir, 'loader', 'val_keys.p')
+        past_train_keys_path = join(work_root, 'past_train_keys.p')
+        past_val_keys_path = join(work_root, 'past_val_keys.p')
+
+        # Load past train val keys
+        if exists(past_train_keys_path):
+            past_train_keys = pickle.load(open(past_train_keys_path, 'rb'))
+        else:
+            past_train_keys = []
+        if exists(past_val_keys_path):
+            past_val_keys = pickle.load(open(past_val_keys_path, 'rb'))
+        else:
+            past_val_keys = []
+
+        # Balance labels for current train val set
+        train_keys = self.chosen_train['key']
+        train_labels = self.chosen_train['gt']
+        val_keys = self.chosen_val['key']
+        val_labels = self.chosen_val['gt']
+
+        train_order = self.balance_labels(train_labels)
+        train_keys_curr = [train_keys[i] for i in train_order]
+        val_bal_order = self.balance_labels(val_labels)
+        val_bal_keys_curr = [val_keys[i] for i in val_bal_order]
+
+        # TODO: assume we don't need val keys before bal
+        train_keys_all = train_keys_curr + past_train_keys
+        val_keys_all = val_bal_keys_curr + past_val_keys
+
+        pickle.dump(train_keys_all, open(train_keys_path, 'wb'))
+        pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
+
+        # Save past train val keys for next time to use
+        pickle.dump(train_keys_all, open(past_train_keys_path, 'wb'))
+        pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
+
+        save_dir = join(work_dir, 'snapshots')
+        os.makedirs(save_dir, exist_ok=True)
+        method = 'resnet'
+
+        # TODO set iters?
+        if self.terminal:
+            iters = 15000
+        else:
+            iters = 5000
+
+        cmd = 'python3 -m vfg.label.train_new trian -t {0} -e {1} -s {2} ' \
+              '-m {3} --category {4} --iters {5} --train-prefix {6}'.format(
+                train_keys_path, val_keys_path, save_dir, method, category, iters,
+                train_prefix)
+
+        output = subprocess.check_output(cmd, shell=True,
+                                         stderr=subprocess.STDOUT)
+
+        # self.current_reward = float(output.decode('utf-8'))
+        # logger.info('current reward in update {} of episode {} is {}'.format(
+        #     self.update, self.episode, self.current_reward))
+
+    def balance_labels(self, labels):
+        pos_indices = np.nonzero(labels > 0)[0]
+        neg_indices = np.nonzero(labels <= 0)[0]
+        num_pos = pos_indices.size
+        num_neg = neg_indices.size
+        num_half = max(num_pos, num_neg)
+        logger.info('pos: %d neg: %d half: %d', num_pos, num_neg, num_half)
+        if num_half > num_pos:
+            pos_indices = np.concatenate([pos_indices for _ in
+                                          range(int(num_half / num_pos + 1))],
+                                         axis=0)
+            pos_indices = pos_indices[:num_half]
+        if num_half > num_neg:
+            neg_indices = np.concatenate([neg_indices for _ in
+                                          range(int(num_half / num_neg + 1))],
+                                         axis=0)
+            neg_indices = neg_indices[:num_half]
+        new_indices = np.concatenate([pos_indices, neg_indices])
+        order = np.random.permutation(num_half * 2)
+        new_indices = new_indices[order]
+        return new_indices
+
     # def write_list(self):
     #     """dumping the training list to file"""
     #     episode = self.episode

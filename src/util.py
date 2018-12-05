@@ -5,6 +5,7 @@ from os.path import exists, join
 import subprocess
 import time
 import logging
+import numpy as np
 
 # we cannot import env directly.
 try:
@@ -35,3 +36,8 @@ def sync_folders(src_dir, dest_dir):
             os.makedirs(dest_dir)
     cmd = 'rsync -avz {} {}'.format(src_dir, dest_dir)
     subprocess.check_call(cmd, shell=True)
+
+
+def softmax(w, t=1.0):
+    e = np.exp(np.array(w) / t)
+    return e / np.sum(e, axis=1)[:, np.newaxis]
