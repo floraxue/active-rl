@@ -720,6 +720,9 @@ if __name__ == '__main__':
     elif args.cmd == 'test':
         logger.info('running testing')
         test(args)
+    elif args.cmd == 'test_fixed':
+        logger.info('running test fixed set')
+        test_fixed_set(args)
     elif args.cmd == 'test_all':
         logger.info('running testing all')
         test_all(args)

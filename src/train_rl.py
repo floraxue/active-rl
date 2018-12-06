@@ -60,10 +60,20 @@ def parse_arguments():
     return args
 
 
-def fixed_set_evaluation():
-    fixed_set_dir = '/data/active-rl-data/data/images/fixed/cat'
-    # TODO
-    pass
+def fixed_set_evaluation(category, save_dir):
+    """
+    Get test accuracy on a fixed set to calculate reward
+    :param category:
+    :param save_dir:
+    :return:
+    """
+    test_keys_path = '/data/active-rl-data/pool/{}_fixed_keys.p'.format(category)
+    method = 'resnet'
+    cmd = 'python3 -m vfg.label.train_new test_fixed -e {0} -s {1} ' \
+          '-m {2} --category {3}'.format(
+            test_keys_path, save_dir, method, category)
+
+    subprocess.check_call(cmd, shell=True, stderr=subprocess.STDOUT)
 
 
 def calculate_reward():
@@ -157,7 +167,7 @@ def train_nsq(args, game, q_func):
                 test_lsun_model()
 
                 # Evaluate on fixed set
-                fixed_set_evaluation()
+                fixed_set_evaluation(category, save_dir)
 
                 # TODO: read reward from difference from LSUN
                 reward = calculate_reward()
@@ -180,7 +190,7 @@ def train_nsq(args, game, q_func):
 
             if done:
                 episode_durations.append(t+1)
-                # TODO
+                # propagate through the whole dataset and split
                 last_trial_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, trial - 1))
                 test_all_data(save_dir, i_episode, last_trial_key_path)
 
