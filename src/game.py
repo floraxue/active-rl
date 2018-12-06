@@ -120,10 +120,11 @@ class VFGGAME:
     def train_model(self):
         # self.write_list()
         category = self.category
-        train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
-            category, self.episode, self.update)
+        # train_prefix = 'RL_{}_episode_{:04d}_update_{:03d}'.format(
+        #     category, self.episode, self.update)
+        train_mode = 'latest_RL'
         work_root = '/data/active-rl-data/classifier'
-        work_dir = join(work_root, train_prefix)
+        work_dir = join(work_root, train_mode)
 
         train_keys_path = join(work_dir, 'loader', 'train_keys.p')
         val_keys_path = join(work_dir, 'loader', 'val_keys.p')
@@ -173,9 +174,8 @@ class VFGGAME:
             iters = 5000
 
         cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
-              '-m {3} --category {4} --iters {5} --train-prefix {6}'.format(
-                train_keys_path, val_keys_path, save_dir, method, category, iters,
-                train_prefix)
+              '-m {3} --category {4} --iters {5}'.format(
+                train_keys_path, val_keys_path, save_dir, method, category, iters)
 
         output = subprocess.check_output(cmd, shell=True,
                                          stderr=subprocess.STDOUT)
@@ -208,10 +208,11 @@ class VFGGAME:
 
     def test_model(self):
         category = self.category
-        test_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
-            category, self.episode, self.update)
+        # test_prefix = '{}_episode_{:04d}_update_{:03d}_RL'.format(
+        #     category, self.episode, self.update)
+        test_mode = 'latest_RL'
         work_root = '/data/active-rl-data/classifier'
-        work_dir = join(work_root, test_prefix)
+        work_dir = join(work_root, test_mode)
 
         test_keys_path = join(work_dir, 'loader', 'test_keys.p')
         past_test_keys_path = join(work_root, 'past_test_keys.p')

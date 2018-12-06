@@ -25,6 +25,8 @@ IMAGE_DIR_TRAIN = '/data/active-rl-data/data/images/train/cat'
 IMAGE_DIR_FIXED = '/data/active-rl-data/data/images/fixed/cat'
 IMAGE_DIR_HOLDOUT = '/data/active-rl-data/data/images/holdout/cat'
 GT_PATH = '/data/active-rl-data/ground_truth/cat_gt_cached.p'
+MACHINE_LABEL_DIR = '/data/active-rl-data/machine_labels'
+CLASSIFIER_ROOT = '/data/active-rl-data/classifier'
 
 
 def args_parser():
@@ -45,9 +47,9 @@ def args_parser():
                         help='current trial id')
     parser.add_argument('--stage', '-st', default=0, type=int,
                         help='stage id')
-    parser.add_argument('--test-prefix', default='train', type=str,
-                        help='choose data to split')
-    parser.add_argument('--model-file', default='', type=str,
+    parser.add_argument('--test-prefix', default='RL_cat_ep_0_up_0', type=str,
+                        help='e.g. RL_cat_ep_1_up_1')
+    parser.add_argument('--model-file-dir', default='', type=str,
                         help='trained model checkpoint')
 
     # flags for training
@@ -524,7 +526,7 @@ def test_fixed_set(args):
     criterion = nn.CrossEntropyLoss().to(device)
 
     # run on the fixed set
-    work_dir = os.path.dirname(args.save_dir)
+    work_dir = os.path.dirname(args.model_file_dir)
     model_file = join(work_dir, 'split_model.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
@@ -559,9 +561,7 @@ def test_fixed_set(args):
             overall_correct += 1
 
     overall_acc = overall_correct / len(keys)
-    mode = env.mode()
-    logger.info("env mode is {}".format(mode))
-    out_file = join(work_dir, 'fixed_set_acc_{}.p'.format(mode))
+    out_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_{}.p'.format(args.test_prefix))
     pickle.dump(overall_acc, open(out_file, 'wb'))
     return overall_acc
 
@@ -572,7 +572,7 @@ def test_all(args):
     model = torch.nn.DataParallel(model).to(device)
     model.eval()
 
-    work_dir = os.path.dirname(args.save_dir)
+    work_dir = os.path.dirname(args.model_file_dir)
     model_file = join(work_dir, 'split_model.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
@@ -596,15 +596,12 @@ def test_all(args):
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
-    # result_dir = join(work_dir, 'split_results')
-    # os.makedirs(result_dir, exist_ok=True)
     split_file = join(work_dir, 'split.json')
     with open(split_file, 'r') as fp:
         split_info = json.load(fp)
 
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
-    # label_dir = env.label_dir(args.category)
     # TODO need to setup args properly with episode
     category = args.category
     trial = args.trial
@@ -662,10 +659,10 @@ def test_all(args):
     # Write to file
     split_keys = [[] for _ in range(3)]
     split_gts = [[] for _ in range(3)]
-    out_pos_path = join(work_dir, '{}_trial_{}_pos.txt'.format(category, trial))
-    out_unsure_path = join(work_dir, '{}_trial_{}_unsure.txt'.format(category, trial))
-    out_unsure_pickle = join(work_dir, '{}_trial_{}_unsure.p'.format(category, trial))
-    out_neg_path = join(work_dir, '{}_trial_{}_neg.txt'.format(category, trial))
+    out_pos_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_pos.txt'.format(category, trial))
+    out_unsure_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.txt'.format(category, trial))
+    out_unsure_pickle = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))
+    out_neg_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_neg.txt'.format(category, trial))
     for i in range(len(keys)):
         k = keys[i]
         score = float(scores[i].item())

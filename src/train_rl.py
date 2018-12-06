@@ -12,6 +12,7 @@ from .buffer import ReplayMemory
 from .game import VFGGAME
 from .explorer import Explorer
 from util import logger
+from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 import subprocess
 
 
@@ -60,40 +61,54 @@ def parse_arguments():
     return args
 
 
-def fixed_set_evaluation(category, save_dir):
+def fixed_set_evaluation(category, mode, i_episode, update):
     """
     Get test accuracy on a fixed set to calculate reward
     :param category:
-    :param save_dir:
+    :param mode:
+    :param i_episode:
+    :param update:
     :return:
     """
     test_keys_path = '/data/active-rl-data/pool/{}_fixed_keys.p'.format(category)
     method = 'resnet'
-    cmd = 'python3 -m vfg.label.train_new test_fixed -e {0} -s {1} ' \
-          '-m {2} --category {3}'.format(
-            test_keys_path, save_dir, method, category)
+    model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
+    test_prefix = '{}_{}_episode_{:04d}_update_{:03d}'.format(mode, category, i_episode, update)
+    cmd = 'python3 -m vfg.label.train_new test_fixed -e {0} ' \
+          '-m {1} --category {2} --test-prefix {3} --model-file-dir {4}'.format(
+            test_keys_path, method, category, test_prefix, model_file_dir)
 
     subprocess.check_call(cmd, shell=True, stderr=subprocess.STDOUT)
 
 
-def calculate_reward():
-    # TODO set work dir from param
-    lsun_file = join(work_dir, 'fixed_set_acc_LSUN.p')
-    rl_file = join(work_dir, 'fixed_set_acc_RL.p')
+def calculate_reward(category, i_episode, update):
+    """
+    Calculate reward from LSUN and RL
+    :return:
+    """
+    prefix = '{}_episode_{:04d}_update_{:03d}'.format(category, i_episode, update)
+    lsun_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_LSUN_{}.p'.format(prefix))
+    rl_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_RL_{}.p'.format(prefix))
     lsun_acc = pickle.load(open(lsun_file, 'rb'))
     rl_acc = pickle.load(open(rl_file, 'rb'))
     acc_gain = rl_acc - lsun_acc
     return acc_gain
 
 
-def test_all_data(save_dir, iters, val_keys_path):
+def test_all_data(category, i_episode):
     """
     test to split the dataset
     :return:
     """
-    cmd = 'python3 -m vfg.label.train_new test_all -e {0} -s {1} ' \
-          '-m {2} --category {3} --iters {4}'.format(
-        val_keys_path, save_dir, 'resnet', 'cat', iters)
+    trial = i_episode
+    mode = 'RL'
+    model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
+    last_trial_key_path = join(MACHINE_LABEL_DIR,
+                               '{}_trial_{}_unsure.p'.format(category, trial - 1))
+
+    cmd = 'python3 -m vfg.label.train_new test_all -e {0} --trial {1}' \
+          '-m {2} --category {3} --model-file-dir {4}'.format(
+            last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
     output = subprocess.check_output(cmd, shell=True,
                                      stderr=subprocess.STDOUT)
@@ -123,12 +138,7 @@ def train_nsq(args, game, q_func):
     # Pipeline params
     category = args.category
     # Set initial unsure key path
-    train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
-        category, game.episode, game.update)
-    work_root = '/data/active-rl-data/classifier'
-    work_dir = join(work_root, 'initial')
-    save_dir = join(work_dir, 'snapshots')
-    new_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, 0))
+    new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, 0))
 
     for i_episode in range(1, args.episodes + 1):
         game.reset(new_key_path)
@@ -162,16 +172,16 @@ def train_nsq(args, game, q_func):
                 # select threshold
                 game.test_model()
 
+                # Evaluate on fixed set
+                fixed_set_evaluation(category, 'RL', i_episode, game.update)
+
                 # TODO
                 train_lsun_model()
                 test_lsun_model()
-
-                # Evaluate on fixed set
-                fixed_set_evaluation(category, save_dir)
+                fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
 
                 # TODO: read reward from difference from LSUN
-                reward = calculate_reward()
-                reward = 0
+                reward = calculate_reward(category, i_episode, game.update)
                 game.current_reward = reward
                 logger.info('current reward in update {} of episode {} is {}'.format(
                             game.update, game.episode, game.current_rewared))
@@ -191,16 +201,10 @@ def train_nsq(args, game, q_func):
             if done:
                 episode_durations.append(t+1)
                 # propagate through the whole dataset and split
-                last_trial_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, trial - 1))
-                test_all_data(save_dir, i_episode, last_trial_key_path)
+                test_all_data(category, i_episode)
 
                 # Set new key path
-                train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
-                    category, game.episode, game.update)
-                work_root = '/data/active-rl-data/classifier'
-                work_dir = join(work_root, train_prefix)
-                save_dir = join(work_dir, 'snapshots')
-                new_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, trial))
+                new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))
                 break
 
         if i_episode % args.target_update == 0:
