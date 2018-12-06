@@ -60,17 +60,8 @@ def parse_arguments():
     return args
 
 
-def test_model():
-    """
-    Select theshold
-    :return:
-    """
-    # TODO
-    pass
-
-
 def fixed_set_evaluation():
-    fixed_set_dir = '/data/active-rl-data/data/images/test/cat'
+    fixed_set_dir = '/data/active-rl-data/data/images/fixed/cat'
     # TODO
     pass
 
@@ -158,7 +149,8 @@ def train_nsq(args, game, q_func):
                                or game.chosen == game.budget):
                 # Train the classifier
                 game.train_model()
-                test_model()
+                # select threshold
+                game.test_model()
 
                 # TODO
                 train_lsun_model()

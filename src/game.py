@@ -206,6 +206,41 @@ class VFGGAME:
         new_indices = new_indices[order]
         return new_indices
 
+    def test_model(self):
+        category = self.category
+        test_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
+            category, self.episode, self.update)
+        work_root = '/data/active-rl-data/classifier'
+        work_dir = join(work_root, test_prefix)
+
+        test_keys_path = join(work_dir, 'loader', 'test_keys.p')
+        past_test_keys_path = join(work_root, 'past_test_keys.p')
+
+        # Load past test keys
+        if exists(past_test_keys_path):
+            past_test_keys = pickle.load(open(past_test_keys_path, 'rb'))
+        else:
+            past_test_keys = []
+
+        test_keys_curr = self.chosen_test['key']
+        test_keys_all = test_keys_curr + past_test_keys
+
+        pickle.dump(test_keys_all, open(test_keys_path, 'wb'))
+
+        # Save past test keys for next time to use
+        pickle.dump(test_keys_all, open(past_test_keys_path, 'wb'))
+
+        save_dir = join(work_dir, 'snapshots')
+        os.makedirs(save_dir, exist_ok=True)
+        method = 'resnet'
+
+        cmd = 'python3 -m vfg.label.train_new test -e {0} -s {1} ' \
+              '-m {2} --category {3}'.format(
+                test_keys_path, save_dir, method, category)
+
+        output = subprocess.check_output(cmd, shell=True,
+                                         stderr=subprocess.STDOUT)
+
     # def write_list(self):
     #     """dumping the training list to file"""
     #     episode = self.episode
