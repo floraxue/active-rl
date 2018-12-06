@@ -114,8 +114,9 @@ class VFGGAME:
 
                 #recording this for LSUN
                 self.latest_num_train = num_train
-                # self.update += 1
-                # self.train_model()
+                self.latest_num_val = num_val
+                self.latest_num_test = num_test
+                self.update += 1
 
         # move to the next sample in the queue
         self.index += 1
@@ -124,7 +125,6 @@ class VFGGAME:
         return self.current_reward, next_state, self.terminal
 
     def train_model(self):
-        # self.write_list()
         category = self.category
         # train_prefix = 'RL_{}_episode_{:04d}_update_{:03d}'.format(
         #     category, self.episode, self.update)
@@ -170,18 +170,22 @@ class VFGGAME:
         pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
 
         save_dir = join(work_dir, 'snapshots')
+        model_file_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
 
         # TODO set iters?
         if self.terminal:
-            iters = 15000
+            # iters = 15000
+            iters = 15
         else:
-            iters = 5000
+            # iters = 5000
+            iters = 5
 
         cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
-              '-m {3} --category {4} --iters {5}'.format(
-                train_keys_path, val_keys_path, save_dir, method, category, iters)
+              '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
+                train_keys_path, val_keys_path, save_dir, method, category, iters,
+                model_file_dir)
 
         output = subprocess.check_output(cmd, shell=True,
                                          stderr=subprocess.STDOUT)

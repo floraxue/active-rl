@@ -173,11 +173,9 @@ def train_nsq(args, game, q_func):
                 game.train_model()
                 # select threshold
                 game.test_model()
-
                 # Evaluate on fixed set
                 fixed_set_evaluation(category, 'RL', i_episode, game.update)
 
-                # TODO
                 train_lsun_model(game)
                 test_lsun_model()
 
@@ -199,7 +197,8 @@ def train_nsq(args, game, q_func):
 
                 # train agent
                 if len(memory) >= 5 * args.batch_size:
-                    _, _, next_state_batch, reward_batch, qvalue_batch, not_done_batch = memory.sample(args.batch_size)
+                    _, _, next_state_batch, reward_batch, \
+                        qvalue_batch, not_done_batch = memory.sample(args.batch_size)
                     robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
 
             state = next_state

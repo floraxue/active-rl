@@ -81,8 +81,8 @@ def train(args):
     model = network.__dict__[args.method]()
     model = torch.nn.DataParallel(model).to(device)
 
-    #NEW load state_dict
-    model_path = join(args.save_dir, 'bal_model_best.pth.tar')
+    # NEW load state_dict
+    model_path = join(args.model_file_dir, 'bal_model_best.pth.tar')
     checkpoint = torch.load(model_path)
     model.load_state_dict(checkpoint['state_dict'])
 
@@ -532,7 +532,7 @@ def test_fixed_set(args):
     criterion = nn.CrossEntropyLoss().to(device)
 
     # run on the fixed set
-    work_dir = os.path.dirname(args.model_file_dir)
+    work_dir = args.model_file_dir
     model_file = join(work_dir, 'split_model.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
@@ -578,7 +578,7 @@ def test_all(args):
     model = torch.nn.DataParallel(model).to(device)
     model.eval()
 
-    work_dir = os.path.dirname(args.model_file_dir)
+    work_dir = args.model_file_dir
     model_file = join(work_dir, 'split_model.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
