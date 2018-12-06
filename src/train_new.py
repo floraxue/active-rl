@@ -78,6 +78,12 @@ def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = network.__dict__[args.method]()
     model = torch.nn.DataParallel(model).to(device)
+
+    #NEW load state_dict
+    model_path = join(args.save_dir, 'bal_model_best.pth.tar')
+    checkpoint = torch.load(model_path)
+    model.load_state_dict(checkpoint['state_dict'])
+
     model.train()
     logger.info('model {} has been initialized'.format(args.method))
 

@@ -13,6 +13,7 @@ from .game import VFGGAME
 from .explorer import Explorer
 from util import logger
 import subprocess
+import network
 
 
 def parse_arguments():
@@ -153,8 +154,6 @@ def train_nsq(args, game, q_func):
                 game.test_model()
 
                 # TODO
-                train_lsun_model()
-                test_lsun_model()
 
                 # Evaluate on fixed set
                 fixed_set_evaluation()
@@ -196,22 +195,6 @@ def train_nsq(args, game, q_func):
         if i_episode % args.target_update == 0:
             robot.target_q_function.load_state_dict(
                 robot.q_function.state_dict())
-
-def train_lsun_model():
-    #read keys for training set
-
-    #load model from last round
-    model = torch.load()
-
-    #train
-
-def test_lsun_model(model):"""
-
-    :param model: the model trained on LSUN
-    :return: LSUN model's performance on fixed dataset
-    """
-    #load the fixed dataset
-
 
 
 def main():
