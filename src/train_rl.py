@@ -14,6 +14,7 @@ from .explorer import Explorer
 from util import logger
 import subprocess
 import network
+from lsun import train_lsun_model, test_lsun_model
 
 
 def parse_arguments():
@@ -164,6 +165,10 @@ def train_nsq(args, game, q_func):
                 game.test_model()
 
                 # TODO
+                train_lsun_model(game)
+                test_lsun_model()
+                #Keep track of the place where last duration left off
+                game.last = game.index
 
                 # Evaluate on fixed set
                 fixed_set_evaluation(category, save_dir)

@@ -62,6 +62,9 @@ class VFGGAME:
         self.chosen_val = {'key': [], 'gt': []}
         self.chosen_test = {'key': [], 'gt': []}
 
+        #added
+        self.last = 0
+
     def reset(self, new_key_path):
         self.chosen = 0
         self.chosen_set = {'key': [], 'gt': []}
@@ -108,6 +111,9 @@ class VFGGAME:
                 self.chosen_val['gt'] += self.chosen_set['gt'][num_train: num_train + num_val]
                 self.chosen_test['key'] += self.chosen_set['key'][-num_test:]
                 self.chosen_test['gt'] += self.chosen_set['gt'][-num_test:]
+
+                #recording this for LSUN
+                self.latest_num_train = num_train
                 # self.update += 1
                 # self.train_model()
 
