@@ -12,6 +12,7 @@ from .buffer import ReplayMemory
 from .game import VFGGAME
 from .explorer import Explorer
 from util import logger
+import subprocess
 
 
 def parse_arguments():
@@ -51,12 +52,19 @@ def parse_arguments():
                         help='prefix of the training files')
     parser.add_argument('--key-path', type=str,
                         help='key path for the unknown data set')
+    parser.add_argument('--work-dir', type=str, default='', help = 'work dir')
 
     args = parser.parse_args()
+    global work_dir
+    work_dir = args.work_dirs
     return args
 
 
 def test_model():
+    """
+    Select theshold
+    :return:
+    """
     # TODO
     pass
 
@@ -77,9 +85,17 @@ def calculate_reward():
     return acc_gain
 
 
-def test_all_data():
-    # TODO
-    pass
+def test_all_data(save_dir, iters, val_keys_path):
+    """
+    test to split the dataset
+    :return:
+    """
+    cmd = 'python3 -m vfg.label.train_new test_all -e {0} -s {1} ' \
+          '-m {2} --category {3} --iters {4}'.format(
+        val_keys_path, save_dir, 'resnet', 'cat', iters)
+
+    output = subprocess.check_output(cmd, shell=True,
+                                     stderr=subprocess.STDOUT)
 
 
 def train_nsq(args, game, q_func):
@@ -144,11 +160,15 @@ def train_nsq(args, game, q_func):
                 game.train_model()
                 test_model()
 
+                # TODO
+                train_lsun_model()
+                test_lsun_model()
+
                 # Evaluate on fixed set
                 fixed_set_evaluation()
 
                 # TODO: read reward from difference from LSUN
-
+                reward = calculate_reward()
                 reward = 0
                 game.current_reward = reward
                 logger.info('current reward in update {} of episode {} is {}'.format(
@@ -169,7 +189,8 @@ def train_nsq(args, game, q_func):
             if done:
                 episode_durations.append(t+1)
                 # TODO
-                test_all_data()
+                last_trial_key_path = join(save_dir, '{}_trial_{}_unsure.p'.format(category, trial - 1))
+                test_all_data(save_dir, i_episode, last_trial_key_path)
 
                 # Set new key path
                 train_prefix = '{}_episode_{:04d}_update_{:03d}'.format(
@@ -183,6 +204,22 @@ def train_nsq(args, game, q_func):
         if i_episode % args.target_update == 0:
             robot.target_q_function.load_state_dict(
                 robot.q_function.state_dict())
+
+def train_lsun_model():
+    #read keys for training set
+
+    #load model from last round
+    model = torch.load()
+
+    #train
+
+def test_lsun_model(model):"""
+
+    :param model: the model trained on LSUN
+    :return: LSUN model's performance on fixed dataset
+    """
+    #load the fixed dataset
+
 
 
 def main():

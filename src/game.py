@@ -172,7 +172,7 @@ class VFGGAME:
         else:
             iters = 5000
 
-        cmd = 'python3 -m vfg.label.train_new trian -t {0} -e {1} -s {2} ' \
+        cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
               '-m {3} --category {4} --iters {5} --train-prefix {6}'.format(
                 train_keys_path, val_keys_path, save_dir, method, category, iters,
                 train_prefix)

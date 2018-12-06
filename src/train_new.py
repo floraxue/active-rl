@@ -21,7 +21,9 @@ import pickle
 
 
 env = Env()
-IMAGE_DIR = '/data/active-rl-data/data/images/train/cat'
+IMAGE_DIR_TRAIN = '/data/active-rl-data/data/images/train/cat'
+IMAGE_DIR_FIXED = '/data/active-rl-data/data/images/fixed/cat'
+IMAGE_DIR_HOLDOUT = '/data/active-rl-data/data/images/holdout/cat'
 GT_PATH = '/data/active-rl-data/ground_truth/cat_gt_cached.p'
 
 
@@ -91,7 +93,7 @@ def train(args):
     logger.info('creating train/val data loader')
     # train_prefix = args.train_prefix + '_train'
     train_loader = data.DataLoader(
-        ImageData(args.train_keys, IMAGE_DIR, GT_PATH,
+        ImageData(args.train_keys, IMAGE_DIR_TRAIN, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=True, pin_memory=True)
     # val_loader = data.DataLoader(
@@ -100,7 +102,7 @@ def train(args):
     #     num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
     val_bal_loader = data.DataLoader(
-        ImageData(args.eval_dir, IMAGE_DIR, GT_PATH, transform=trans),
+        ImageData(args.eval_dir, IMAGE_DIR_TRAIN, GT_PATH, transform=trans),
         batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
     logger.info('finished creating data loaders')
@@ -337,7 +339,7 @@ def test(args):
     # the first stage will be using the full test data and for the later
     # stages, use the unknown part of the data for testing
     test_loader = data.DataLoader(
-        ImageData(args.eval_keys, IMAGE_DIR, GT_PATH,
+        ImageData(args.eval_keys, IMAGE_DIR_TRAIN, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
@@ -515,7 +517,7 @@ def test_fixed_set(args):
 
     # data loader
     test_loader = data.DataLoader(
-        ImageData(args.eval_keys, IMAGE_DIR, GT_PATH,
+        ImageData(args.eval_keys, IMAGE_DIR_FIXED, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
@@ -590,7 +592,7 @@ def test_all(args):
     args.batch_size = args.batch_size
 
     test_loader = data.DataLoader(
-        ImageData(args.eval_dir, args.test_prefix, args.category,
+        ImageData(args.eval_dir, IMAGE_DIR_TRAIN, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
@@ -655,8 +657,7 @@ def test_all(args):
             #     logger.info('write to file and release memory')
             #     scores, keys, labels = [], [], []
 
-    logger.info('finish evaluation all data with prefix {}'.format(
-        args.test_prefix))
+    logger.info('finish evaluation all data')
 
     # Write to file
     split_keys = [[] for _ in range(3)]
