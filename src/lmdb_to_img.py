@@ -6,21 +6,20 @@ import lmdb
 import six
 import shutil
 
-import numpy as np
-from env_obj import Env
-from util import logger, checkdir
+from util import logger
+import pickle
 
-env = Env()
 workspace = '/data/active-rl-data'
 data_root = '/data/active-rl-data/data'
 
 
 def create_images(category, db_index):
     # open the db
-    in_db_path = env.category_raw_data_path(category, db_index)
-    checkdir(join(data_root, 'local_paths', category))
-    out_local_path = join(data_root, 'local_paths', category, str(db_index) + '.txt')
-    img_out_dir = join(data_root, 'images', category)
+    # in_db_path = env.category_raw_data_path(category, db_index)
+    in_db_path = '/data/active-rl-data/data/cat_000{}_lmdb'.format(db_index)
+    # checkdir(join(data_root, 'local_paths', category))
+    # out_local_path = join(data_root, 'local_paths', category, str(db_index) + '.txt')
+    img_out_dir = join(data_root, 'images', 'holdout', category)
     ImageFile.LOAD_TRUNCATED_IMAGES = True
     max_dim = 400
 
@@ -36,11 +35,13 @@ def create_images(category, db_index):
         raise
 
     # read and save the images
+    logger.info("reading and saving")
     lmdb_cursor = lmdb_txn.cursor()
     out_paths = []
     error_cnt = 0
     i = 0
     start_time = time.time()
+    keys = []
     for key, value in lmdb_cursor:
         key = key.decode('ascii')
         out_path = join(img_out_dir, key + '.jpg')
@@ -66,6 +67,7 @@ def create_images(category, db_index):
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             image.save(out_path, 'JPEG', quality=75)
         out_paths.append(out_path)
+        keys.append(key)
 
         i += 1
         if (i + 1) % 1000 == 0:
@@ -73,10 +75,11 @@ def create_images(category, db_index):
                         time.time() - start_time)
 
     # save the out_paths
-    logger.info('Writing %s', out_local_path)
-    with open(out_local_path, 'w') as fp:
-        for p in out_paths:
-            print(p, file=fp)
+    # logger.info('Writing %s', out_local_path)
+    # with open(out_local_path, 'w') as fp:
+    #     for p in out_paths:
+    #         print(p, file=fp)
+    return keys
 
 
 def move_images(category):
@@ -122,10 +125,14 @@ def move_train_to_test(category):
 
 def main():
     category = "cat"
-    # create_images(category, 0)
-    # create_images(category, 1)
+    keys = create_images(category, 2)
+    keys += create_images(category, 3)
     # move_images(category)
-    move_train_to_test(category)
+    # move_train_to_test(category)
+    # save the keys
+    pool_dir = '/data/active-rl-data/pool'
+    out_holdout_keys_path = join(pool_dir, 'cat_holdout_keys.p')
+    pickle.dump(keys, open(out_holdout_keys_path, 'wb'))
 
 
 if __name__ == "__main__":

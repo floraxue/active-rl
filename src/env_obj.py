@@ -2,11 +2,9 @@
 
 from __future__ import print_function, division
 import os
-import platform
 from collections import Iterable
-from datetime import datetime
 
-from os.path import join, expanduser, split, dirname, exists
+from os.path import join
 from util import logger, checkdir
 
 

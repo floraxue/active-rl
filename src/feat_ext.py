@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import os
-from os.path import join, exists
+from os.path import exists
 import argparse
 import torch.utils.data as data
 import torchvision.models as models

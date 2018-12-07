@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision.datasets as datasets
 import torch.optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
@@ -8,12 +7,11 @@ import time
 import argparse
 from dataset import ImageData
 import network
-from util import logger, softmax
+from util import logger
 from env_obj import Env
 import os
 from os.path import join, exists
 import shutil
-import pdb
 import torch.nn.functional as F
 import numpy as np
 import json

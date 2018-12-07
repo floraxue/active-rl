@@ -1,5 +1,3 @@
-from util import logger, softmax
-from env_obj import Env
 import os
 from os.path import join, exists
 import numpy as np
@@ -126,7 +124,7 @@ def load_keys(game):
     pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
     pickle.dump(test_keys_all, open(test_keys_path, 'wb'))
 
-    # Save past keys for next time to use
-    pickle.dump(train_keys_all, open(past_train_keys_path, 'wb'))
-    pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
-    pickle.dump(test_keys_all, open(past_test_keys_path, 'wb'))
+    # # Save past keys for next time to use
+    # pickle.dump(train_keys_all, open(past_train_keys_path, 'wb'))
+    # pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
+    # pickle.dump(test_keys_all, open(past_test_keys_path, 'wb'))

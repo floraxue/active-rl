@@ -4,17 +4,13 @@ import torch.optim as optim
 from itertools import count
 import argparse
 from os.path import join
-import pickle
 
 from .agent import NSQ
 from .policy import PolicyNet
-from .buffer import ReplayMemory
 from .game import VFGGAME
 from .explorer import Explorer
 from util import logger
-from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
-import subprocess
-import network
+from train_new import MACHINE_LABEL_DIR
 from lsun import train_lsun_model, test_lsun_model
 
 def parse_arguments():
