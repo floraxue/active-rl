@@ -16,6 +16,7 @@ from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 import subprocess
 import network
 from lsun import train_lsun_model, test_lsun_model
+from train_rl import calculate_reward
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
@@ -114,32 +115,29 @@ def test_nsq(args, game, q_func):
             if action > 0 and (game.chosen % game.duration == 0
                                or game.chosen == game.budget):
                 # Train the classifier
-                game.train_model()
+                game.train_model('latest_RL', '/data/active-rl-data/classifier_holdout')
                 # select threshold
-                game.test_model()
+                game.test_model('latest_RL', '/data/active-rl-data/classifier_holdout')
 
                 # Evaluate on fixed set
-                fixed_set_evaluation(category, 'RL', i_episode, game.update)
 
                 # TODO
-                train_lsun_model(game)
-                test_lsun_model()
+                train_lsun_model(game, 'latest_LSUN', '/data/active-rl-data/classifier_holdout')
+                test_lsun_model('latest_LSUN', '/data/active-rl-data/classifier_holdout')
 
                 # Keep track of the place where last duration left off
                 game.last = game.index
 
-                fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
-
                 # TODO: read reward from difference from LSUN
-                reward = calculate_reward(category, i_episode, game.update)
-                game.current_reward = reward
-                logger.info('current reward in update {} of episode {} is {}'.format(
-                    game.update, game.episode, game.current_rewared))
-                reward_seq += [reward] * len(act_seq)
-                memory.push(state_seq, act_seq, next_state_seq,
-                            reward_seq, qvalue_seq, done_seq)
-                state_seq, act_seq, reward_seq = [], [], []
-                next_state_seq, qvalue_seq, done_seq = [], [], []
+                # reward = calculate_reward(category, i_episode, game.update)
+                # game.current_reward = reward
+                # logger.info('current reward in update {} of episode {} is {}'.format(
+                #     game.update, game.episode, game.current_rewared))
+                # reward_seq += [reward] * len(act_seq)
+                # memory.push(state_seq, act_seq, next_state_seq,
+                #             reward_seq, qvalue_seq, done_seq)
+                # state_seq, act_seq, reward_seq = [], [], []
+                # next_state_seq, qvalue_seq, done_seq = [], [], []
 
                 # train agent
                 if len(memory) >= 5 * args.batch_size:
