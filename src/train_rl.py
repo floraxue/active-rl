@@ -209,11 +209,9 @@ def train_nsq(args, game, q_func):
 
                 # Set new key path
                 new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))
+                robot.target_q_function.load_state_dict(
+                    robot.q_function.state_dict())
                 break
-
-        if i_episode % args.target_update == 0:
-            robot.target_q_function.load_state_dict(
-                robot.q_function.state_dict())
 
 
 def main():

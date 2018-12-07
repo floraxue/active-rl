@@ -12,10 +12,10 @@ from .buffer import ReplayMemory
 from .game import VFGGAME
 from .explorer import Explorer
 from util import logger
-from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
+from train_new import MACHINE_LABEL_DIR_HOLDOUT, CLASSIFIER_ROOT_HOLDOUT
 import subprocess
 import network
-from lsun import train_lsun_model, test_lsun_model
+from lsun import train_lsun_model, test_lsun_model_holdout, train_lsun_model_holdout
 from train_rl import calculate_reward
 
 def parse_arguments():
@@ -85,15 +85,16 @@ def test_nsq(args, game, q_func):
     # Pipeline params
     category = args.category
     # Set initial unsure key path
-    new_key_path = '/data/'
 
+    #Test on RL agent
+    logger.info('Testing on RL agent')
+    new_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, '{}_trial_{}_unsure.p'.format(category, 0))
     for i_episode in range(1, args.episodes + 1):
         game.reset(new_key_path)
 
         # pipeline param
         trial = i_episode
 
-        # this is to reset the hidden units, not repackage the variables
         robot.q_function.reset_hidden()
         robot.target_q_function.reset_hidden()
 
@@ -101,64 +102,53 @@ def test_nsq(args, game, q_func):
         # since our policy network takes the hidden state and the current
         # feature as input. The hidden state is passed implicitly
         state = game.sample()
-        state_seq, act_seq, reward_seq = [], [], []
-        next_state_seq, qvalue_seq, done_seq = [], [], []
         for t in count():
             action, qvalue = robot.act(state)
             reward, next_state, done = game.step(action)
-            state_seq += [state]
-            act_seq += [action]
-            next_state_seq += [next_state]
-            qvalue_seq += [qvalue]
-            done_seq += [done]
 
             if action > 0 and (game.chosen % game.duration == 0
                                or game.chosen == game.budget):
                 # Train the classifier
-                game.train_model('latest_RL', '/data/active-rl-data/classifier_holdout')
+                game.train_model('latest_RL', CLASSIFIER_ROOT_HOLDOUT)
                 # select threshold
-                game.test_model('latest_RL', '/data/active-rl-data/classifier_holdout')
-
-                # Evaluate on fixed set
-
-                # TODO
-                train_lsun_model(game, 'latest_LSUN', '/data/active-rl-data/classifier_holdout')
-                test_lsun_model('latest_LSUN', '/data/active-rl-data/classifier_holdout')
-
-                # Keep track of the place where last duration left off
-                game.last = game.index
-
-                # TODO: read reward from difference from LSUN
-                # reward = calculate_reward(category, i_episode, game.update)
-                # game.current_reward = reward
-                # logger.info('current reward in update {} of episode {} is {}'.format(
-                #     game.update, game.episode, game.current_rewared))
-                # reward_seq += [reward] * len(act_seq)
-                # memory.push(state_seq, act_seq, next_state_seq,
-                #             reward_seq, qvalue_seq, done_seq)
-                # state_seq, act_seq, reward_seq = [], [], []
-                # next_state_seq, qvalue_seq, done_seq = [], [], []
-
-                # train agent
-                if len(memory) >= 5 * args.batch_size:
-                    _, _, next_state_batch, reward_batch, qvalue_batch, not_done_batch = memory.sample(args.batch_size)
-                    robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
+                game.test_model('latest_RL', CLASSIFIER_ROOT_HOLDOUT)
 
             state = next_state
 
             if done:
                 episode_durations.append(t + 1)
                 # propagate through the whole dataset and split
-                test_all_data(category, i_episode)
-
-                # Set new key path
-                new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))
+                test_all_data_holdout(category, i_episode, "RL")
+                new_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, 'RL', '{}_trial_{}_unsure.p'.format(category, trial))
                 break
 
-        if i_episode % args.target_update == 0:
-            robot.target_q_function.load_state_dict(
-                robot.q_function.state_dict())
+    #Test on LSUN
+    logger.info("Testing on LSUN")
+    for i_episode in range(1, args.episodes + 1):
+        trial = i_episode
+        new_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, 'latest_LSUN',
+                            '{}_trial_{}_unsure.p'.format('cat', trial - 1))
+        train_lsun_model_holdout(game, "latest_LSUN", CLASSIFIER_ROOT_HOLDOUT, new_key_path)
+        test_lsun_model_holdout("latest_LSUN", CLASSIFIER_ROOT_HOLDOUT)
 
+        test_all_data_holdout(category, i_episode, "LSUN")
+
+def test_all_data_holdout(category, i_episode, mode):
+    """
+    test to split the dataset
+    :return:
+    """
+    trial = i_episode
+    model_file_dir = join(CLASSIFIER_ROOT_HOLDOUT, 'latest_{}'.format(mode), 'snapshots')
+    last_trial_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, mode,
+                               '{}_trial_{}_unsure.p'.format(category, trial - 1))
+
+    cmd = 'python3 -m vfg.label.train_new test_all -e {0} --trial {1}' \
+          '-m {2} --category {3} --model-file-dir {4}'.format(
+            last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
+
+    output = subprocess.check_output(cmd, shell=True,
+                                     stderr=subprocess.STDOUT)
 
 def main():
     args = parse_arguments()
