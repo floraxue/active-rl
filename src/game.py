@@ -13,7 +13,7 @@ Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 class VFGGAME:
 
     def __init__(self, args):
-        self.category = category = args.category
+        self.category = args.category
         self.key_path = args.key_path
         self.feat_dir = args.feat_dir
         self.gt_path = args.gt_path
@@ -120,12 +120,10 @@ class VFGGAME:
 
         return self.current_reward, next_state, self.terminal
 
-    def train_model(self):
+    def train_model(self, train_mode, work_root):
         category = self.category
         # train_prefix = 'RL_{}_episode_{:04d}_update_{:03d}'.format(
         #     category, self.episode, self.update)
-        train_mode = 'latest_RL'
-        work_root = '/data/active-rl-data/classifier'
         work_dir = join(work_root, train_mode)
 
         train_keys_path = join(work_dir, 'loader', 'train_keys.p')
@@ -186,10 +184,6 @@ class VFGGAME:
         output = subprocess.check_output(cmd, shell=True,
                                          stderr=subprocess.STDOUT)
 
-        # self.current_reward = float(output.decode('utf-8'))
-        # logger.info('current reward in update {} of episode {} is {}'.format(
-        #     self.update, self.episode, self.current_reward))
-
     def balance_labels(self, labels):
         pos_indices = np.nonzero(labels > 0)[0]
         neg_indices = np.nonzero(labels <= 0)[0]
@@ -212,12 +206,10 @@ class VFGGAME:
         new_indices = new_indices[order]
         return new_indices
 
-    def test_model(self):
+    def test_model(self, test_mode, work_root):
         category = self.category
         # test_prefix = '{}_episode_{:04d}_update_{:03d}_RL'.format(
         #     category, self.episode, self.update)
-        test_mode = 'latest_RL'
-        work_root = '/data/active-rl-data/classifier'
         work_dir = join(work_root, test_mode)
 
         test_keys_path = join(work_dir, 'loader', 'test_keys.p')

@@ -8,9 +8,10 @@ import pickle
 
 from agent import NSQ
 from policy import PolicyNet
-from .buffer import ReplayMemory
-from .game import VFGGAME
-from .explorer import Explorer
+
+from buffer import ReplayMemory
+from game import VFGGAME
+from explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 import subprocess
@@ -65,6 +66,7 @@ def parse_arguments():
     args = parser.parse_args()
     # global work_dir
     # work_dir = args.work_dirs
+
     return args
 
 
@@ -179,14 +181,14 @@ def train_nsq(args, game, q_func):
             if action > 0 and (game.chosen % game.duration == 0
                                or game.chosen == game.budget):
                 # Train the classifier
-                game.train_model()
+                game.train_model(train_mode='latest_RL', work_root='/data/active-rl-data/classifier')
                 # select threshold
-                game.test_model()
+                game.test_model(test_mode='latest_RL', work_root='/data/active-rl-data/classifier')
                 # Evaluate on fixed set
                 fixed_set_evaluation(category, 'RL', i_episode, game.update)
 
-                train_lsun_model(game)
-                test_lsun_model()
+                train_lsun_model(game, 'latest_LSUN', '/data/active-rl-data/classifier')
+                test_lsun_model('latest_LSUN', '/data/active-rl-data/classifier')
 
                 # Keep track of the place where last duration left off
                 game.last = game.index

@@ -8,12 +8,10 @@ import subprocess
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 
 
-def train_lsun_model(game):
+def train_lsun_model(game, train_mode, work_root):
     load_keys(game)
 
     category = 'cat'
-    train_mode = 'latest_LSUN'
-    work_root = '/data/active-rl-data/classifier'
     work_dir = join(work_root, train_mode)
 
     train_keys_path = join(work_dir, 'loader', 'train_keys.p')
@@ -41,11 +39,9 @@ def train_lsun_model(game):
                                      stderr=subprocess.STDOUT)
 
 
-def test_lsun_model():
+def test_lsun_model(test_mode, work_root):
     category = 'cat'
-    train_mode = 'latest_LSUN'
-    work_root = '/data/active-rl-data/classifier'
-    work_dir = join(work_root, train_mode)
+    work_dir = join(work_root, test_mode)
     test_keys_path = join(work_dir, 'loader', 'test_keys.p')
     assert exists(test_keys_path)
 
