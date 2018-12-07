@@ -33,7 +33,7 @@ class FeatDataset(data.Dataset):
         key = self.keys[index]
         target = self.gts[key]
         feat_path = join(self.feat_dir, key + '.npz')
-        feat = np.load(feat_path)
+        feat = np.load(feat_path)['arr_0']
         return feat, target, key
 
     def __len__(self):

@@ -43,15 +43,15 @@ class NSQ(object):
         """
         sample = random.random()
         eps_threshold = self.explorer.value(self.t)
+        feat = torch.from_numpy(feat).unsqueeze(0).cuda()
+        qvalue, hidden_unit = self.q_function(feat)
         if sample > eps_threshold:
-            feat = torch.from_numpy(feat).unsqueeze(0)
-            qvalue, hidden_unit = self.q_function(feat)
             action_index = np.argmax(qvalue)
         else:
             action_index = random.randrange(self.num_actions)
 
         self.t += 1
-        return action_index
+        return action_index, qvalue
 
     def update(self, next_state_batch, past_rewards, past_action_values,
                not_done_mask):

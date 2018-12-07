@@ -25,7 +25,8 @@ def parse_arguments():
                         help='printing frequency')
     parser.add_argument('--crop-size', type=int, default=224,
                         help='cropping size')
-    parser.add_argument('--datadir','-d', help='datadir')
+    parser.add_argument('--datadir','-d', default='/data/active-rl-data/data/images/',
+                        help='datadir')
     parser.add_argument('--gpu-id','-g', default='0', type=str,
                         help='id(s) for CUDA_VISIBLE_DEVICES')
     args = parser.parse_args()
@@ -87,8 +88,6 @@ def extract_feats(args):
                 p.parent.mkdir(parents=True, exist_ok = True)
                 p.touch(exist_ok=True)
                 out = np.array(outputs[j]).squeeze()
-                if exists(outfile):
-                    continue
                 np.savez(outfile, out)
             batch_time.update(time.time() - end)
             end = time.time()

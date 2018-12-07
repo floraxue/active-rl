@@ -160,8 +160,8 @@ def train_nsq(args, game, q_func):
         trial = i_episode
 
         # this is to reset the hidden units, not repackage the variables
-        robot.q_function.reset_hidden()
-        robot.target_q_function.reset_hidden()
+        robot.q_function.reset_hidden(args.batch_size)
+        robot.target_q_function.reset_hidden(args.batch_size)
 
         # sample the initial feature from the environment
         # since our policy network takes the hidden state and the current

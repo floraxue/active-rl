@@ -44,6 +44,9 @@ class PolicyNet(nn.Module):
         c0 = torch.zeros(self.num_layers, bsz, self.hidden_size)
         return h0, c0
 
+    def reset_hidden(self, bsz):
+        self.hidden = self.init_hidden(bsz)
+
     def forward(self, x):
         if len(x.size()) == 1:
             bsz = 1
