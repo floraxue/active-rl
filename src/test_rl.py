@@ -1,3 +1,4 @@
+import sys
 import torch
 import torch.optim as optim
 
@@ -5,10 +6,10 @@ from itertools import count
 import argparse
 from os.path import join
 
-from .agent import NSQ
-from .policy import PolicyNet
-from .game import VFGGAME
-from .explorer import Explorer
+from agent import NSQ
+from policy import PolicyNet
+from game import VFGGAME
+from explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR_HOLDOUT, CLASSIFIER_ROOT_HOLDOUT
 from lsun import train_lsun_model, test_lsun_model_holdout, train_lsun_model_holdout
@@ -141,12 +142,15 @@ def test_all_data_holdout(category, i_episode, mode):
     last_trial_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, mode,
                                '{}_trial_{}_unsure.p'.format(category, trial - 1))
 
-    cmd = 'python3 -m vfg.label.train_new test_all -e {0} --trial {1}' \
+    cmd = 'python3 train_new.py test_all -e {0} --trial {1}' \
           '-m {2} --category {3} --model-file-dir {4}'.format(
             last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
-    output = subprocess.check_output(cmd, shell=True,
-                                     stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 def main():
     args = parse_arguments()

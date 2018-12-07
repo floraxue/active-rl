@@ -3,6 +3,9 @@ import subprocess
 from collections import namedtuple
 import os
 from os.path import join, exists
+
+import sys
+
 from util import logger
 from dataset import FeatDataset
 import pickle
@@ -87,7 +90,7 @@ class VFGGAME:
         return self.current_sample.feat
 
     def step(self, action):
-        if self.chosen == self.budget:
+        if self.chosen == self.budget or self.index == len(self.train_data) - 1:
             self.terminal = True
 
         if action > 0:
@@ -170,23 +173,25 @@ class VFGGAME:
 
         # TODO set iters?
         if self.terminal:
+            iters = 100
             # iters = 15000
-            iters = 15
         else:
+            iters = 50
             # iters = 5000
-            iters = 5
 
-        cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
+        cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
               '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
                 train_keys_path, val_keys_path, save_dir, method, category, iters,
                 model_file_dir)
-
-        output = subprocess.check_output(cmd, shell=True,
-                                         stderr=subprocess.STDOUT)
+        try:
+            subprocess.check_call(cmd, shell=True)
+        except subprocess.CalledProcessError as exc:
+            print("Status : FAIL", exc.returncode, exc.output)
+            sys.exit(-1)
 
     def balance_labels(self, labels):
-        pos_indices = np.nonzero(labels > 0)[0]
-        neg_indices = np.nonzero(labels <= 0)[0]
+        pos_indices = np.nonzero(list(map(lambda x: x+1,labels)))[0]
+        neg_indices = np.nonzero(list(map(lambda x: x-1 ,labels)))[0]
         num_pos = pos_indices.size
         num_neg = neg_indices.size
         num_half = max(num_pos, num_neg)
@@ -233,12 +238,15 @@ class VFGGAME:
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
 
-        cmd = 'python3 -m vfg.label.train_new test -e {0} -s {1} ' \
+        cmd = 'python3 train_new.py test -e {0} -s {1} ' \
               '-m {2} --category {3}'.format(
                 test_keys_path, save_dir, method, category)
 
-        output = subprocess.check_output(cmd, shell=True,
-                                         stderr=subprocess.STDOUT)
+        try:
+            subprocess.check_call(cmd, shell=True)
+        except subprocess.CalledProcessError as exc:
+            print("Status : FAIL", exc.returncode, exc.output)
+            sys.exit(-1)
 
     # def write_list(self):
     #     """dumping the training list to file"""

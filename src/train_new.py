@@ -32,7 +32,7 @@ MACHINE_LABEL_DIR_HOLDOUT = '/data/active-rl-data/machine_labels_holdout'
 
 def args_parser():
     parser = argparse.ArgumentParser(description='Pytorch training')
-    parser.add_argument('cmd', type=str, choices=['train', 'test', 'test_all'])
+    parser.add_argument('cmd', type=str, choices=['train', 'test', 'test_all', 'test_fixed'])
     parser.add_argument('--train-keys', '-t', metavar='DIR',
                         help='path to training dataset')
     parser.add_argument('--eval-keys', '-e', metavar='DIR',
@@ -58,7 +58,7 @@ def args_parser():
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--iters', default=15000, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=100, type=int,
+    parser.add_argument('-b', '--batch-size', default=256, type=int,
                         metavar='N', help='mini-batch size (default: 256)')
     parser.add_argument('-c', '--crop-size', default=224, type=int,
                         metavar='N', help='image crop size (default: 224)')
@@ -68,7 +68,7 @@ def args_parser():
                         help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)')
-    parser.add_argument('--num-workers', type=int, default=8, metavar='N',
+    parser.add_argument('--num-workers', type=int, default=30, metavar='N',
                         help='number of workers')
     parser.add_argument('--print-freq', type=int, default=10)
     parser.add_argument('--eval-every', type=int, default=1000)
@@ -84,8 +84,9 @@ def train(args):
 
     # NEW load state_dict
     model_path = join(args.model_file_dir, 'bal_model_best.pth.tar')
-    checkpoint = torch.load(model_path)
-    model.load_state_dict(checkpoint['state_dict'])
+    if exists(model_path):
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['state_dict'])
 
     model.train()
     logger.info('model {} has been initialized'.format(args.method))
@@ -111,7 +112,7 @@ def train(args):
     #     num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
     val_bal_loader = data.DataLoader(
-        ImageData(args.eval_dir, IMAGE_DIR_TRAIN, GT_PATH, transform=trans),
+        ImageData(args.eval_keys, IMAGE_DIR_TRAIN, GT_PATH, transform=trans),
         batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
     logger.info('finished creating data loaders')
@@ -137,7 +138,7 @@ def train(args):
 
     for start in range(0, args.iters, len(train_loader)):
         end = time.time()
-        for j, (input, target, _, _) in enumerate(train_loader):
+        for j, (input, target, _) in enumerate(train_loader):
             data_time.update(time.time() - end)
             i = j + start
             adjust_learning_rate(args, optimizer, i)
@@ -359,7 +360,7 @@ def test(args):
     test_names = ['bal']
     split_results = []
     accuracies = []
-    work_dir = os.path.dirname(args.save_dir)
+    work_dir = args.save_dir
     for i, tn in enumerate(test_names):
         logger.info('Try on the best model evaluated on {} data'.format(tn))
         model_path = join(args.save_dir, '{}_model_best.pth.tar'.format(tn))
@@ -382,6 +383,7 @@ def test(args):
         recalls = np.cumsum(ordered_labels) / np.sum(test_labels)
         good_precisions = precisions > 0.95
         good_recall = recalls > 0.99
+
         try:
             pos_cut = int(np.nonzero(good_precisions)[0][-1])
             pos_thresh = float(ordered_scores[pos_cut])
@@ -416,7 +418,7 @@ def test(args):
                   'method': args.method,
                   'category': args.category,
                   'crops': 1,
-                  'trials': args.trial_prefix}
+                  'trials': args.train_prefix}
 
         out_path = join(work_dir, 'split_{}_{}.json'.format(tn, iteration))
         with open(out_path, 'w') as fp:
@@ -547,6 +549,9 @@ def test_fixed_set(args):
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
 
+    pos_thresh = 0.99
+    neg_thresh = 0.01
+
     prec1, scores, keys, labels = validate(
         args.print_freq, test_loader, model, criterion, _iter, for_test=True)
 
@@ -599,7 +604,7 @@ def test_all(args):
     args.batch_size = args.batch_size
 
     test_loader = data.DataLoader(
-        ImageData(args.eval_dir, IMAGE_DIR_TRAIN, GT_PATH,
+        ImageData(args.eval_keys, IMAGE_DIR_TRAIN, GT_PATH,
                   transform=trans), batch_size=args.batch_size,
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
@@ -609,6 +614,10 @@ def test_all(args):
 
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
+
+    pos_thresh = 0.99
+    neg_thresh = 0.01
+
     # TODO need to setup args properly with episode
     category = args.category
     trial = args.trial
@@ -639,7 +648,7 @@ def test_all(args):
 
             if len(softmax_.size()) == 1:
                 softmax_ = softmax_.reshape((1, softmax_.size(0)))
-            score = softmax_[:, 1]
+            score = softmax_[:, 1].to('cpu').numpy()
             scores.append(score)
             keys += key
             labels.append(target)
@@ -662,7 +671,8 @@ def test_all(args):
             #     scores, keys, labels = [], [], []
 
     logger.info('finish evaluation all data')
-
+    scores = np.concatenate(scores)
+    labels = np.concatenate(labels)
     # Write to file
     split_keys = [[] for _ in range(3)]
     split_gts = [[] for _ in range(3)]
@@ -672,10 +682,10 @@ def test_all(args):
     out_neg_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_neg.txt'.format(category, trial))
     for i in range(len(keys)):
         k = keys[i]
-        score = float(scores[i].item())
+        score = scores[i]
         lab = int(score > pos_thresh) + int(score > neg_thresh)
         split_keys[lab].append(k)
-        tar = int(labels[i].item())
+        tar = int(labels[i])
         if tar == 0:
             tar = -1
         split_gts[lab].append(str(tar))

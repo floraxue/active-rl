@@ -55,6 +55,8 @@ class ImageData(data.Dataset):
         image = Image.open(image_path).convert('RGB')
         if self.transform:
             image = self.transform(image)
+        if target == -1:
+            target = 0
         return image, target, key
 
     def __len__(self):

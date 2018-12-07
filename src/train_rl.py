@@ -1,3 +1,4 @@
+import sys
 import torch
 import torch.optim as optim
 
@@ -32,7 +33,7 @@ def parse_arguments():
                         help='decay steps')
     parser.add_argument('--gamma', type=float, default=0.999,
                         help='discount factor')
-    parser.add_argument('--duration', '-k', type=int, default=100,
+    parser.add_argument('--duration', '-k', type=int, default=500,
                         help='get reward every k steps')
     parser.add_argument('--batch-size', type=int, default=128,
                         help='batch size')
@@ -83,11 +84,15 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     method = 'resnet'
     model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
     test_prefix = '{}_{}_episode_{:04d}_update_{:03d}'.format(mode, category, i_episode, update)
-    cmd = 'python3 -m vfg.label.train_new test_fixed -e {0} ' \
+    cmd = 'python3 train_new.py test_fixed -e {0} ' \
           '-m {1} --category {2} --test-prefix {3} --model-file-dir {4}'.format(
             test_keys_path, method, category, test_prefix, model_file_dir)
 
-    subprocess.check_call(cmd, shell=True, stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 
 def calculate_reward(category, i_episode, update):
@@ -115,12 +120,15 @@ def test_all_data(category, i_episode):
     last_trial_key_path = join(MACHINE_LABEL_DIR,
                                '{}_trial_{}_unsure.p'.format(category, trial - 1))
 
-    cmd = 'python3 -m vfg.label.train_new test_all -e {0} --trial {1}' \
+    cmd = 'python3 train_new.py test_all -e {0} --trial {1} ' \
           '-m {2} --category {3} --model-file-dir {4}'.format(
             last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
-    output = subprocess.check_output(cmd, shell=True,
-                                     stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 
 def train_nsq(args, game, q_func):
@@ -160,8 +168,8 @@ def train_nsq(args, game, q_func):
         trial = i_episode
 
         # this is to reset the hidden units, not repackage the variables
-        robot.q_function.reset_hidden(args.batch_size)
-        robot.target_q_function.reset_hidden(args.batch_size)
+        robot.q_function.reset_hidden()
+        robot.target_q_function.reset_hidden()
 
         # sample the initial feature from the environment
         # since our policy network takes the hidden state and the current
@@ -180,6 +188,7 @@ def train_nsq(args, game, q_func):
 
             if action > 0 and (game.chosen % game.duration == 0
                                or game.chosen == game.budget):
+                print("-------------{}/{}-------------".format(game.chosen, game.budget))
                 # Train the classifier
                 game.train_model(train_mode='latest_RL', work_root='/data/active-rl-data/classifier')
                 # select threshold
@@ -198,8 +207,8 @@ def train_nsq(args, game, q_func):
                 # Read reward from difference from LSUN
                 reward = calculate_reward(category, i_episode, game.update)
                 game.current_reward = reward
-                logger.info('current reward in update {} of episode {} is {}'.format(
-                            game.update, game.episode, game.current_rewared))
+                logger.info('current rewaexrd in update {} of episode {} is {}'.format(
+                            game.update, game.episode, game.current_reward))
                 reward_seq += [reward]*len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
                             reward_seq, qvalue_seq, done_seq)
@@ -208,6 +217,7 @@ def train_nsq(args, game, q_func):
 
                 # train agent
                 if len(memory) >= 5 * args.batch_size:
+                    logger.info('updating robot')
                     _, _, next_state_batch, reward_batch, \
                         qvalue_batch, not_done_batch = memory.sample(args.batch_size)
                     robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
