@@ -8,13 +8,13 @@ import pickle
 
 from agent import NSQ
 from policy import PolicyNet
+
 from buffer import ReplayMemory
 from game import VFGGAME
 from explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 import subprocess
-import network
 from lsun import train_lsun_model, test_lsun_model
 
 
@@ -22,7 +22,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
     parser.add_argument('--category', type=str, default='cat',
                         help='image category')
-    parser.add_argument('--budget', type=int, default=10000,
+    parser.add_argument('--budget', type=int, default=5000,
                         help='maximum number of examples for human annotation')
     parser.add_argument('--eps-start', type=float, default=0.9,
                         help='starting epsilon')
@@ -32,8 +32,8 @@ def parse_arguments():
                         help='decay steps')
     parser.add_argument('--gamma', type=float, default=0.999,
                         help='discount factor')
-    parser.add_argument('--duration', '-N', type=int, default=100,
-                        help='get reward every N steps')
+    parser.add_argument('--duration', '-k', type=int, default=100,
+                        help='get reward every k steps')
     parser.add_argument('--batch-size', type=int, default=128,
                         help='batch size')
     parser.add_argument('--target-update', '-T', type=int, default=1000,
@@ -46,19 +46,27 @@ def parse_arguments():
                         help='feature size')
     parser.add_argument('--save-every', type=int, default=1,
                         help='save the checkpoint every K episode')
-    parser.add_argument('--val_rate', type=float, default=0.2)
-    parser.add_argument('--test_rate', type=float, default=0.2)
+    parser.add_argument('--episodes', type=int, default=5)
+
     # flags for the game
     parser.add_argument('--eval-dir', type=str, default='',
                         help='path to the training list folder')
     parser.add_argument('--train-prefix', type=str, default='train',
                         help='prefix of the training files')
     parser.add_argument('--key-path', type=str,
+                        default='/data/active-rl-data/machine_labels/cat_trial_0_unsure.p',
                         help='key path for the unknown data set')
-    parser.add_argument('--work-dir', type=str, default='', help = 'work dir')
-    parser.add_argument('--feat-dir', type=str, default='', help='work dir')
+    parser.add_argument('--feat-dir', type=str,
+                        default='/data/active-rl-data/data/feats/train/cat')
+    parser.add_argument('--gt-path', type=str,
+                        default='/data/active-rl-data/ground_truth/cat_gt_cached.p')
+    parser.add_argument('--val_rate', type=float, default=0.2)
+    parser.add_argument('--test_rate', type=float, default=0.2)
 
     args = parser.parse_args()
+    # global work_dir
+    # work_dir = args.work_dirs
+
     return args
 
 
@@ -144,6 +152,10 @@ def train_nsq(args, game, q_func):
     for i_episode in range(1, args.episodes + 1):
         game.reset(new_key_path)
 
+        if len(game.train_data) < game.budget:
+            logger.info("Unsure set is smaller than budget size. End this experiment.")
+            break
+
         # pipeline param
         trial = i_episode
 
@@ -183,7 +195,7 @@ def train_nsq(args, game, q_func):
 
                 fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
 
-                # TODO: read reward from difference from LSUN
+                # Read reward from difference from LSUN
                 reward = calculate_reward(category, i_episode, game.update)
                 game.current_reward = reward
                 logger.info('current reward in update {} of episode {} is {}'.format(

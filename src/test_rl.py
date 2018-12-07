@@ -4,19 +4,17 @@ import torch.optim as optim
 from itertools import count
 import argparse
 from os.path import join
-import pickle
 
 from .agent import NSQ
 from .policy import PolicyNet
-from .buffer import ReplayMemory
 from .game import VFGGAME
 from .explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR_HOLDOUT, CLASSIFIER_ROOT_HOLDOUT
-import subprocess
-import network
 from lsun import train_lsun_model, test_lsun_model_holdout, train_lsun_model_holdout
-from train_rl import calculate_reward
+
+import subprocess
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")

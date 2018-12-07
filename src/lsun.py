@@ -1,5 +1,3 @@
-from util import logger, softmax
-from env_obj import Env
 import os
 from os.path import join, exists
 import numpy as np
@@ -8,6 +6,7 @@ from collections import namedtuple
 import subprocess
 from dataset import FeatDataset, ImageData
 from train_new import MACHINE_LABEL_DIR_HOLDOUT, IMAGE_DIR_HOLDOUT, GT_PATH_HOLDOUT
+from util import logger
 
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 
@@ -242,3 +241,4 @@ def load_keys_holdout(game, train_mode, work_root, new_key_path):
     pickle.dump(train_keys_all, open(past_train_keys_path, 'wb'))
     pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
     pickle.dump(test_keys_all, open(past_test_keys_path, 'wb'))
+
