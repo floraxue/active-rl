@@ -68,7 +68,7 @@ def extract_feats(args):
         transforms.ToTensor(),
         normalize,
     ])
-    traindir = os.path.join(args.datadir, 'train')
+    traindir = os.path.join(args.datadir, 'holdout')
     trainset = ImageFolderWithPaths(traindir, transform_train)
     loader = data.DataLoader(
         trainset,
