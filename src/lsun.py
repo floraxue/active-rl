@@ -30,11 +30,11 @@ def train_lsun_model(game, train_mode, work_root):
 
     # TODO set iters?
     if game.terminal:
-        # iters = 15000
-        iters = 100
+        iters = 15000
+        # iters = 100
     else:
-        # iters = 5000
-        iters = 50
+        iters = 5000
+        # iters = 50
 
     cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
           '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
@@ -105,11 +105,11 @@ def train_lsun_model_holdout(game, train_mode, work_root, new_key_path):
 
     # TODO set iters?
     if game.terminal:
-        # iters = 15000
-        iters = 100
+        iters = 15000
+        # iters = 100
     else:
-        # iters = 5000
-        iters = 50
+        iters = 5000
+        # iters = 50
 
     cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
           '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(

@@ -44,8 +44,7 @@ class NSQ(object):
         sample = random.random()
         eps_threshold = self.explorer.value(self.t)
 
-        state = state.unsqueeze(0).cuda()
-
+        state = torch.from_numpy(state).unsqueeze(0).cuda()
         qvalue, hidden_unit = self.q_function(state)
         if sample > eps_threshold:
             action_index = torch.argmax(qvalue)

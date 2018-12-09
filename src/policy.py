@@ -83,7 +83,7 @@ class PolicyNet(nn.Module):
         return out, self.hidden
 
 class NewPolicyNet(nn.Module):
-    def __init__(self,in_size, num_actions):
+    def __init__(self, in_size, num_actions):
         super().__init__()
         self.network = MLP(in_dim=in_size, out_dim=num_actions)
 

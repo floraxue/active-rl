@@ -10,7 +10,7 @@ __dict__ = ['mlp', 'resnet']
 
 
 class MLP(nn.Module):
-    def __init__(self, in_dim=2049, out_dim=2):
+    def __init__(self, in_dim=2050, out_dim=2):
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(in_dim, 128)
         self.relu = nn.ReLU(inplace=True)
@@ -74,5 +74,5 @@ class BinaryModel(nn.Module):
 
 
 def resnet():
-    model = BinaryModel('resnet18')
+    model = models.resnet18(pretrained=True,num_classes = 2)
     return model

@@ -23,7 +23,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
     parser.add_argument('--category', type=str, default='cat',
                         help='image category')
-    parser.add_argument('--budget', type=int, default=5000,
+    parser.add_argument('--budget', type=int, default=1000,
                         help='maximum number of examples for human annotation')
     parser.add_argument('--eps-start', type=float, default=0.9,
                         help='starting epsilon')
@@ -33,9 +33,9 @@ def parse_arguments():
                         help='decay steps')
     parser.add_argument('--gamma', type=float, default=0.999,
                         help='discount factor')
-    parser.add_argument('--duration', '-k', type=int, default=500,
+    parser.add_argument('--duration', '-k', type=int, default=50,
                         help='get reward every k steps')
-    parser.add_argument('--batch-size', type=int, default=128,
+    parser.add_argument('--batch-size', type=int, default=512,
                         help='batch size')
     parser.add_argument('--target-update', '-T', type=int, default=1000,
                         help='update target network every T steps')
@@ -47,7 +47,7 @@ def parse_arguments():
                         help='feature size')
     parser.add_argument('--save-every', type=int, default=1,
                         help='save the checkpoint every K episode')
-    parser.add_argument('--episodes', type=int, default=5)
+    parser.add_argument('--episodes', type=int, default=20)
 
     # flags for the game
     parser.add_argument('--eval-dir', type=str, default='',
@@ -55,12 +55,12 @@ def parse_arguments():
     parser.add_argument('--train-prefix', type=str, default='train',
                         help='prefix of the training files')
     parser.add_argument('--key-path', type=str,
-                        default='/data/active-rl-data/machine_labels/cat_trial_0_unsure.p',
+                        default='/data3/floraxue/cs294/active-rl-data/machine_labels/cat_trial_0_unsure.p',
                         help='key path for the unknown data set')
     parser.add_argument('--feat-dir', type=str,
-                        default='/data/active-rl-data/data/feats/train/cat')
+                        default='/data3/floraxue/cs294/active-rl-data/data/feats/train/cat')
     parser.add_argument('--gt-path', type=str,
-                        default='/data/active-rl-data/ground_truth/cat_gt_cached.p')
+                        default='/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached.p')
     parser.add_argument('--val_rate', type=float, default=0.2)
     parser.add_argument('--test_rate', type=float, default=0.2)
 
@@ -89,7 +89,7 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     :param update:
     :return:
     """
-    test_keys_path = '/data/active-rl-data/pool/{}_fixed_keys.p'.format(category)
+    test_keys_path = '/data3/floraxue/cs294/active-rl-data/pool/{}_fixed_keys.p'.format(category)
     method = 'resnet'
     model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
     test_prefix = '{}_{}_episode_{:04d}_update_{:03d}'.format(mode, category, i_episode, update)
@@ -185,14 +185,14 @@ def train_nsq(args, game, q_func):
                                or game.chosen == game.budget):
                 print("-------------{}/{}-------------".format(game.chosen, game.budget))
                 # Train the classifier
-                game.train_model(train_mode='latest_RL', work_root='/data/active-rl-data/classifier')
+                game.train_model(train_mode='latest_RL', work_root='/data3/floraxue/cs294/active-rl-data/classifier')
                 # select threshold
-                game.test_model(test_mode='latest_RL', work_root='/data/active-rl-data/classifier')
+                game.test_model(test_mode='latest_RL', work_root='/data3/floraxue/cs294/active-rl-data/classifier')
                 # Evaluate on fixed set
                 fixed_set_evaluation(category, 'RL', i_episode, game.update)
 
-                # train_lsun_model(game, 'latest_LSUN', '/data/active-rl-data/classifier')
-                # test_lsun_model('latest_LSUN', '/data/active-rl-data/classifier')
+                # train_lsun_model(game, 'latest_LSUN', '/data3/floraxue/cs294/active-rl-data/classifier')
+                # test_lsun_model('latest_LSUN', '/data3/floraxue/cs294/active-rl-data/classifier')
 
                 # Keep track of the place where last duration left off
                 # game.last = game.index

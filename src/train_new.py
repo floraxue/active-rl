@@ -19,15 +19,15 @@ import pickle
 
 
 env = Env()
-IMAGE_DIR_TRAIN = '/data/active-rl-data/data/images/train/cat'
-IMAGE_DIR_FIXED = '/data/active-rl-data/data/images/fixed/cat'
-IMAGE_DIR_HOLDOUT = '/data/active-rl-data/data/images/holdout/cat'
-GT_PATH = '/data/active-rl-data/ground_truth/cat_gt_cached.p'
-GT_PATH_HOLDOUT = '/data/active-rl-data/ground_truth/cat_gt_cached_holdout.p'
-MACHINE_LABEL_DIR = '/data/active-rl-data/machine_labels'
-CLASSIFIER_ROOT = '/data/active-rl-data/classifier'
-CLASSIFIER_ROOT_HOLDOUT = '/data/active-rl-data/classifier_holdout'
-MACHINE_LABEL_DIR_HOLDOUT = '/data/active-rl-data/machine_labels_holdout'
+IMAGE_DIR_TRAIN = '/data3/floraxue/cs294/active-rl-data/data/images/train/cat'
+IMAGE_DIR_FIXED = '/data3/floraxue/cs294/active-rl-data/data/images/fixed/cat'
+IMAGE_DIR_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/data/images/holdout/cat'
+GT_PATH = '/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached.p'
+GT_PATH_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached_holdout.p'
+MACHINE_LABEL_DIR = '/data3/floraxue/cs294/active-rl-data/machine_labels'
+CLASSIFIER_ROOT = '/data3/floraxue/cs294/active-rl-data/classifier'
+CLASSIFIER_ROOT_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/classifier_holdout'
+MACHINE_LABEL_DIR_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/machine_labels_holdout'
 
 
 def args_parser():
@@ -54,8 +54,8 @@ def args_parser():
                         help='trained model checkpoint')
 
     # flags for training
-    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                        help='number of data loading workers (default: 4)')
+    parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
+                        help='number of data loading workers (default: 32)')
     parser.add_argument('--iters', default=15000, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('-b', '--batch-size', default=256, type=int,
@@ -75,7 +75,6 @@ def args_parser():
     args = parser.parse_args()
 
     return args
-
 
 def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -117,7 +116,7 @@ def train(args):
         num_workers=args.num_workers, shuffle=False, pin_memory=True)
     logger.info('finished creating data loaders')
 
-    optim_params = model.module.optim_parameters()
+    optim_params = model.parameters()
     criterion = nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(optim_params, args.lr,
                                 momentum=args.momentum,
@@ -149,7 +148,7 @@ def train(args):
 
             # compute output
             # no need to call variable in PyTorch 0.4
-            output, _ = model(input)
+            output = model(input)
             loss = criterion(output, target)
 
             # measure accuracy and record loss
@@ -287,7 +286,7 @@ def validate(print_freq, val_loader, model, criterion, _iter, for_test=False):
             target = target.to(device)
 
             # compute output
-            output, _ = model(input)
+            output = model(input)
             loss = criterion(output, target)
 
             # measure accuracy and record loss
@@ -549,8 +548,8 @@ def test_fixed_set(args):
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
 
-    pos_thresh = 0.99
-    neg_thresh = 0.01
+    pos_thresh = 0.98
+    neg_thresh = 0.02
 
     prec1, scores, keys, labels = validate(
         args.print_freq, test_loader, model, criterion, _iter, for_test=True)
@@ -615,8 +614,8 @@ def test_all(args):
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
 
-    pos_thresh = 0.99
-    neg_thresh = 0.01
+    pos_thresh = 0.98
+    neg_thresh = 0.02
 
     # TODO need to setup args properly with episode
     category = args.category
@@ -643,7 +642,7 @@ def test_all(args):
         end = time.time()
         for i,  (input, target, key) in enumerate(test_loader):
             input = input.to(device)
-            output, _ = model(input)
+            output = model(input)
             softmax_ = F.softmax(output, dim=-1)
 
             if len(softmax_.size()) == 1:
