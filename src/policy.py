@@ -4,6 +4,7 @@ import torch.autograd as autograd
 import numpy as np
 import os
 import math
+from network import MLP
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -80,3 +81,11 @@ class PolicyNet(nn.Module):
         out = self.fc(out).squeeze()
 
         return out, self.hidden
+
+class NewPolicyNet(nn.Module):
+    def __init__(self,in_size, num_actions):
+        super().__init__()
+        self.network = MLP(in_dim=in_size, out_dim=num_actions)
+
+    def forward(self, x):
+        return self.network(x)

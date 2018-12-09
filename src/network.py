@@ -10,14 +10,12 @@ __dict__ = ['mlp', 'resnet']
 
 
 class MLP(nn.Module):
-    def __init__(self, batch_size=2048, in_dim=6096):
+    def __init__(self, in_dim=2049, out_dim=2):
         super(MLP, self).__init__()
-        self.batch_size = batch_size
         self.fc1 = nn.Linear(in_dim, 128)
         self.relu = nn.ReLU(inplace=True)
         self.drop = nn.Dropout(p=0.5, inplace=True)
-        self.fc2 = nn.Linear(128, 128)
-        self.final = nn.Linear(128, 2)
+        self.fc2 = nn.Linear(128, out_dim)
 
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -27,19 +25,12 @@ class MLP(nn.Module):
     def forward(self, x):
         x = x.squeeze()
         x = self.drop(self.relu(self.fc1(x)))
-        x = self.drop(self.relu(self.fc2))
-        x = self.final(x)
+        x = self.fc2(x)
         return x
 
     def optim_parameters(self):
         for param in self.parameters():
             yield param
-
-
-def mlp(bs=2048, in_dim=6096):
-    model = MLP(batch_size=bs, in_dim=in_dim)
-    return model
-
 
 class BinaryModel(nn.Module):
     """ :returns
@@ -83,5 +74,5 @@ class BinaryModel(nn.Module):
 
 
 def resnet():
-    model = BinaryModel('resnet101')
+    model = BinaryModel('resnet18')
     return model

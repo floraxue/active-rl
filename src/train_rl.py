@@ -8,7 +8,7 @@ from os.path import join
 import pickle
 
 from agent import NSQ
-from policy import PolicyNet
+from policy import NewPolicyNet
 
 from buffer import ReplayMemory
 from game import VFGGAME
@@ -43,7 +43,7 @@ def parse_arguments():
     parser.add_argument('--buffer-size', type=int, default=100000)
     parser.add_argument('--num-actions', type=int, default=2,
                         help='default action is `keep` or `drop`')
-    parser.add_argument('--input_dim', type=int, default=2048,
+    parser.add_argument('--input_dim', type=int, default=2050,
                         help='feature size')
     parser.add_argument('--save-every', type=int, default=1,
                         help='save the checkpoint every K episode')
@@ -70,6 +70,15 @@ def parse_arguments():
 
     return args
 
+def calculate_reward(last_acc, category, i_episode, update):
+    """
+    Calculate reward from LSUN and RL
+    :return:
+    """
+    prefix = '{}_episode_{:04d}_update_{:03d}'.format(category, i_episode, update)
+    rl_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_RL_{}.p'.format(prefix))
+    rl_acc = pickle.load(open(rl_file, 'rb'))
+    return rl_acc - last_acc, rl_acc
 
 def fixed_set_evaluation(category, mode, i_episode, update):
     """
@@ -93,21 +102,6 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     except subprocess.CalledProcessError as exc:
         print("Status : FAIL", exc.returncode, exc.output)
         sys.exit(-1)
-
-
-def calculate_reward(category, i_episode, update):
-    """
-    Calculate reward from LSUN and RL
-    :return:
-    """
-    prefix = '{}_episode_{:04d}_update_{:03d}'.format(category, i_episode, update)
-    lsun_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_LSUN_{}.p'.format(prefix))
-    rl_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_RL_{}.p'.format(prefix))
-    lsun_acc = pickle.load(open(lsun_file, 'rb'))
-    rl_acc = pickle.load(open(rl_file, 'rb'))
-    acc_gain = rl_acc - lsun_acc
-    return acc_gain
-
 
 def test_all_data(category, i_episode):
     """
@@ -157,6 +151,7 @@ def train_nsq(args, game, q_func):
     # Set initial unsure key path
     new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, 0))
 
+    last_acc = 0
     for i_episode in range(1, args.episodes + 1):
         game.reset(new_key_path)
 
@@ -168,8 +163,8 @@ def train_nsq(args, game, q_func):
         trial = i_episode
 
         # this is to reset the hidden units, not repackage the variables
-        robot.q_function.reset_hidden()
-        robot.target_q_function.reset_hidden()
+        # robot.q_function.reset_hidden()
+        # robot.target_q_function.reset_hidden()
 
         # sample the initial feature from the environment
         # since our policy network takes the hidden state and the current
@@ -196,18 +191,18 @@ def train_nsq(args, game, q_func):
                 # Evaluate on fixed set
                 fixed_set_evaluation(category, 'RL', i_episode, game.update)
 
-                train_lsun_model(game, 'latest_LSUN', '/data/active-rl-data/classifier')
-                test_lsun_model('latest_LSUN', '/data/active-rl-data/classifier')
+                # train_lsun_model(game, 'latest_LSUN', '/data/active-rl-data/classifier')
+                # test_lsun_model('latest_LSUN', '/data/active-rl-data/classifier')
 
                 # Keep track of the place where last duration left off
-                game.last = game.index
+                # game.last = game.index
 
-                fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
+                # fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
 
                 # Read reward from difference from LSUN
-                reward = calculate_reward(category, i_episode, game.update)
+                reward, last_acc = calculate_reward(last_acc, category, i_episode, game.update)
                 game.current_reward = reward
-                logger.info('current rewaexrd in update {} of episode {} is {}'.format(
+                logger.info('current reward in update {} of episode {} is {}'.format(
                             game.update, game.episode, game.current_reward))
                 reward_seq += [reward]*len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
@@ -239,7 +234,7 @@ def train_nsq(args, game, q_func):
 def main():
     args = parse_arguments()
     game = VFGGAME(args)
-    q_func = PolicyNet
+    q_func = NewPolicyNet
     train_nsq(args, game, q_func)
 
 

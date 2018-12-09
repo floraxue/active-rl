@@ -3,12 +3,15 @@ import subprocess
 from collections import namedtuple
 import os
 from os.path import join, exists
-
+from train_new import IMAGE_DIR_TRAIN, CLASSIFIER_ROOT
+from torchvision import models
 import sys
+import torch
 
 from util import logger
-from dataset import FeatDataset
+from dataset import FeatDataset, ImageData
 import pickle
+import torch.nn.functional as F
 
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 
@@ -23,6 +26,9 @@ class VFGGAME:
         self.train_data = FeatDataset(key_path=self.key_path,
                                       feat_dir=self.feat_dir,
                                       gt_path=self.gt_path)
+        self.image_data = ImageData(key_path = self.key_path,
+                                    image_dir = IMAGE_DIR_TRAIN,
+                                    gt_path=self.gt_path)
 
         # decide the querying order
         self.order = np.random.permutation(range(len(self.train_data)))
@@ -84,10 +90,25 @@ class VFGGAME:
         self.current_reward = 0
 
     def sample(self):
-        """ return the feature of the current sample """
+        """ return the state of the current image """
         item = self.train_data[self.order[self.index]]
         self.current_sample = Sample(*item)
-        return self.current_sample.feat
+        feat = self.current_sample.feat
+        image = torch.from_numpy(self.image_data[self.order[self.index]])
+        prob = self.get_prob(image)
+
+        return torch.cat([feat, prob])
+
+    def get_prob(self, image):
+        curr_model_path = join(CLASSIFIER_ROOT, "latest_RL", "snapshots", 'bal_model_best.pth.tar')
+        model = models.resnet34(pretrained=False)
+        model.load_state_dict(torch.load(curr_model_path))
+        model.eval()
+        output = model(image)
+        softmax_ = F.softmax(output, dim=-1)
+        if len(softmax_.size()) == 2:
+            softmax_ = softmax_[0]
+        return softmax_
 
     def step(self, action):
         if self.chosen == self.budget or self.index == len(self.train_data) - 1:
