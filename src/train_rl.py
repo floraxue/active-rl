@@ -26,7 +26,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
     parser.add_argument('--category', type=str, default='cat',
                         help='image category')
-    parser.add_argument('--budget', type=int, default=1000,
+    parser.add_argument('--budget', type=int, default=2000,
                         help='maximum number of examples for human annotation')
     parser.add_argument('--eps-start', type=float, default=0.9,
                         help='starting epsilon')
@@ -36,9 +36,9 @@ def parse_arguments():
                         help='decay steps')
     parser.add_argument('--gamma', type=float, default=0.999,
                         help='discount factor')
-    parser.add_argument('--duration', '-k', type=int, default=50,
+    parser.add_argument('--duration', '-k', type=int, default=100,
                         help='get reward every k steps')
-    parser.add_argument('--batch-size', type=int, default=512,
+    parser.add_argument('--batch-size', type=int, default=2048,
                         help='batch size')
     parser.add_argument('--target-update', '-T', type=int, default=1000,
                         help='update target network every T steps')
@@ -74,7 +74,7 @@ def parse_arguments():
     return args
 
 
-def calculate_reward(last_acc, category, i_episode, update):
+def calculate_reward(category, i_episode, update):
     """
     Calculate reward from LSUN and RL
     :return:
@@ -82,7 +82,7 @@ def calculate_reward(last_acc, category, i_episode, update):
     prefix = '{}_episode_{:04d}_update_{:03d}'.format(category, i_episode, update)
     rl_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_RL_{}.p'.format(prefix))
     rl_acc = pickle.load(open(rl_file, 'rb'))
-    return rl_acc - last_acc, rl_acc
+    return rl_acc
 
 
 def fixed_set_evaluation(category, mode, i_episode, update):
@@ -207,7 +207,7 @@ def train_nsq(args, game, q_func):
                 # fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
 
                 # Read reward from difference from LSUN
-                reward, last_acc = calculate_reward(last_acc, category, i_episode, game.update)
+                reward = calculate_reward(category, i_episode, game.update)
                 game.current_reward = reward
                 writer.add_scalar(str(i_episode) + '/reward', reward, game.update)
                 logger.info('current reward in update {} of episode {} is {}'.format(

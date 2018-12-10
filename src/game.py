@@ -193,7 +193,9 @@ class VFGGAME:
         if exists(past_train_keys_path):
             past_train_keys = pickle.load(open(past_train_keys_path, 'rb'))
         else:
-            past_train_keys = []
+            initial_train_keys_path = join(work_root, 'initial_trial_keys.p')
+            past_train_keys = pickle.load(open(initial_train_keys_path, 'rb'))
+
         if exists(past_val_keys_path):
             past_val_keys = pickle.load(open(past_val_keys_path, 'rb'))
         else:
@@ -216,12 +218,14 @@ class VFGGAME:
         train_keys_all = train_keys_curr + past_train_keys
         val_keys_all = val_bal_keys_curr + past_val_keys
 
-        pickle.dump(train_keys_all, open(train_keys_path, 'wb'))
-        pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
-
         # Save past train val keys for next time to use
         pickle.dump(train_keys_all, open(past_train_keys_path, 'wb'))
         pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
+
+        #use only a portion of the past_train_keys for this time
+        past_train_keys_curr = np.random.choice(past_train_keys, size=len(past_train_keys)//5, replace = False).tolist()
+        pickle.dump(train_keys_curr + past_train_keys_curr, open(train_keys_path, 'wb'))
+        pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
 
         save_dir = join(work_dir, 'snapshots')
         model_file_dir = save_dir
