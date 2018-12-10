@@ -2,15 +2,17 @@ import torch
 import torch.nn as nn
 import numpy as np
 import os
-from os.path import exists
+from os.path import exists, join
 import argparse
 import torch.utils.data as data
 import torchvision.models as models
 import torchvision.transforms as transforms
-from dataset import ImageFolderWithPaths
+from dataset import ImageData
 import time
+import pickle
 from pathlib import Path
 from util import logger
+from train_new import IMAGE_DIR_TRAIN, GT_PATH
 
 
 def parse_arguments():
@@ -25,8 +27,9 @@ def parse_arguments():
                         help='printing frequency')
     parser.add_argument('--crop-size', type=int, default=224,
                         help='cropping size')
-    parser.add_argument('--datadir','-d', default='/data/active-rl-data/data/images/',
-                        help='datadir')
+    parser.add_argument('--key-path','-k',
+                        default='/data3/floraxue/cs294/active-rl-data/pool/cat_train_keys.p',
+                        help='train key path')
     parser.add_argument('--gpu-id','-g', default='0', type=str,
                         help='id(s) for CUDA_VISIBLE_DEVICES')
     args = parser.parse_args()
@@ -68,8 +71,7 @@ def extract_feats(args):
         transforms.ToTensor(),
         normalize,
     ])
-    traindir = os.path.join(args.datadir, 'holdout')
-    trainset = ImageFolderWithPaths(traindir, transform_train)
+    trainset = ImageData(args.key_path, IMAGE_DIR_TRAIN, GT_PATH, transform_train)
     loader = data.DataLoader(
         trainset,
         batch_size=args.batch_size, num_workers=args.num_workers,
@@ -78,11 +80,12 @@ def extract_feats(args):
     batch_time = AverageMeter()
     with torch.no_grad():
         end = time.time()
-        for i, (inputs, targets, paths) in enumerate(loader):
+        for i, (inputs, targets, keys) in enumerate(loader):
             inputs = inputs.to(device)
             outputs = feat_model(inputs)
             for j in range(inputs.size(0)):
-                path = paths[j]
+                k = keys[j]
+                path = join(IMAGE_DIR_TRAIN, k + '.jpg')
                 outfile = path.replace('images', 'feats').replace('jpg','npz')
                 p = Path(outfile)
                 p.parent.mkdir(parents=True, exist_ok = True)

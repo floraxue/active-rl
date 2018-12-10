@@ -62,7 +62,6 @@ def parse_arguments():
     work_dir = args.work_dirs
     return args
 
-HOLDOUT_PATH = '/data/active-rl/'
 
 def test_nsq(args, game, q_func):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -84,18 +83,18 @@ def test_nsq(args, game, q_func):
     # Pipeline params
     category = args.category
     # Set initial unsure key path
-
-    #Test on RL agent
-    logger.info('Testing on RL agent')
     new_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, '{}_trial_{}_unsure.p'.format(category, 0))
+
+    # Test on RL agent
+    logger.info('Testing on RL agent')
     for i_episode in range(1, args.episodes + 1):
         game.reset(new_key_path)
 
         # pipeline param
         trial = i_episode
 
-        robot.q_function.reset_hidden()
-        robot.target_q_function.reset_hidden()
+        robot.q_function.reset_hidden(args.batch_size)
+        robot.target_q_function.reset_hidden(args.batch_size)
 
         # sample the initial feature from the environment
         # since our policy network takes the hidden state and the current
@@ -121,7 +120,7 @@ def test_nsq(args, game, q_func):
                 new_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, 'RL', '{}_trial_{}_unsure.p'.format(category, trial))
                 break
 
-    #Test on LSUN
+    # Test on LSUN
     logger.info("Testing on LSUN")
     for i_episode in range(1, args.episodes + 1):
         trial = i_episode
@@ -131,6 +130,7 @@ def test_nsq(args, game, q_func):
         test_lsun_model_holdout("latest_LSUN", CLASSIFIER_ROOT_HOLDOUT)
 
         test_all_data_holdout(category, i_episode, "LSUN")
+
 
 def test_all_data_holdout(category, i_episode, mode):
     """

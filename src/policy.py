@@ -16,7 +16,6 @@ class PolicyNet(nn.Module):
         self.hidden_size = hidden_size
         self.num_actions = num_actions
         self.feat_size = feat_size
-        self.hidden_size = hidden_size
         self.num_layers = nlayers
 
         # feature dimension reduction

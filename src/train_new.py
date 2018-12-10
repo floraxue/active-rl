@@ -60,6 +60,8 @@ def args_parser():
                         help='e.g. RL_cat_ep_1_up_1')
     parser.add_argument('--model-file-dir', default='', type=str,
                         help='trained model checkpoint')
+    parser.add_argument('--out-split-dir', type=str,
+                        help='dir to save results for test_all')
 
     # flags for training
     parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',

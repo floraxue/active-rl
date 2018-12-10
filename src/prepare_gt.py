@@ -6,7 +6,7 @@ data_root = '/data/active-rl-data/data'
 
 
 def main():
-    fpath = '/data/active-rl-data/ground_truth/cat_gt_holdout.txt'
+    fpath = '/data/active-rl-data/ground_truth/cat_gt_more.txt'
     dic = {}
     with open(fpath, 'r') as fp:
         lines = fp.readlines()
@@ -15,7 +15,7 @@ def main():
             dic[key] = int(label)
 
     pickle.dump(dic,
-                open('/data/active-rl-data/ground_truth/cat_gt_cached_holdout.p', 'wb'))
+                open('/data/active-rl-data/ground_truth/cat_gt_cached_more.p', 'wb'))
 
     train_dir = join(data_root, 'images', 'holdout', 'cat')
     # test_dir = join(data_root, 'images', 'test', 'cat')
