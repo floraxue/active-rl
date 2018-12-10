@@ -19,7 +19,7 @@ from train_new import test_fixed_set, test_all
 import random
 from tensorboardX import SummaryWriter
 
-writer = SummaryWriter()
+writer = SummaryWriter('runs/')
 
 
 def parse_arguments():
@@ -184,7 +184,7 @@ def train_nsq(args, game, q_func):
                 test_acc1 = game.test_model(test_mode='latest_RL',
                                             work_root='/data3/floraxue/cs294/active-rl-data/classifier',
                                             writer=writer,
-                                            name=str(i_episode) + '/accuracy',
+                                            name=str(i_episode) + '/threshold',
                                             duration=game.update)
                 # Evaluate on fixed set
                 fix_acc1, fix_sure_acc1 = fixed_set_evaluation(category, 'RL', i_episode, game.update)
@@ -193,7 +193,7 @@ def train_nsq(args, game, q_func):
                     'val_acc1': val_acc1,
                     'test_acc1': test_acc1,
                     'fix_acc1': fix_acc1,
-                    'fix_sure_acc1': fix_sure_acc1},
+                    'fix_sure_acc1': fix_sure_acc1*100},
                                    game.update)
 
                 writer.add_scalar(str(i_episode) + '/lr', lr, game.update)

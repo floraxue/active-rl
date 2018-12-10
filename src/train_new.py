@@ -439,9 +439,6 @@ def test(test_keys_path, save_dir, method, category, writer, name, duration):
                             'posThresh': pos_thresh,
                             'negCut': neg_cut, 'negRatio': neg_cut / len(test_labels),
                             'negThresh': neg_thresh,
-                            'recallCuts': recall_cuts,
-                            'recallThresholds': recall_thresholds,
-                            'recallPercentages': recall_percentages,
                             'total': len(test_labels)
                             }, duration)
 
