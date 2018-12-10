@@ -16,9 +16,10 @@ from explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 from train_new import test_fixed_set, test_all
-import subprocess
-from lsun import train_lsun_model, test_lsun_model
 import random
+from tensorboardX import SummaryWriter
+
+writer = SummaryWriter('runs/')
 
 
 def parse_arguments():
@@ -97,7 +98,7 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     method = 'resnet'
     model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
     test_prefix = '{}_{}_episode_{:04d}_update_{:03d}'.format(mode, category, i_episode, update)
-    test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir)
+    return test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir)
 
 
 def test_all_data(category, i_episode):
@@ -142,6 +143,7 @@ def train_nsq(args, game, q_func):
 
     last_acc = 0
     for i_episode in range(1, args.episodes + 1):
+        lr = adjust_learning_rate(i_episode)
         game.reset(new_key_path)
 
         if len(game.train_data) < game.budget:
@@ -164,7 +166,7 @@ def train_nsq(args, game, q_func):
         for t in count():
             action, qvalue = robot.act(state)
             # action, qvalue = random.randrange(num_actions), 0
-            reward, next_state, done = game.step(action)
+            _, next_state, done = game.step(action)
             state_seq += [state]
             act_seq += [action]
             next_state_seq += [next_state]
@@ -175,11 +177,26 @@ def train_nsq(args, game, q_func):
                                or game.chosen == game.budget):
                 print("-------------{}/{}-------------".format(game.chosen, game.budget))
                 # Train the classifier
-                game.train_model(train_mode='latest_RL', work_root='/data3/floraxue/cs294/active-rl-data/classifier')
+                train_acc1, val_acc1 = game.train_model(train_mode='latest_RL',
+                                                        work_root='/data3/floraxue/cs294/active-rl-data/classifier',
+                                                        lr=lr)
                 # select threshold
-                game.test_model(test_mode='latest_RL', work_root='/data3/floraxue/cs294/active-rl-data/classifier')
+                test_acc1 = game.test_model(test_mode='latest_RL',
+                                            work_root='/data3/floraxue/cs294/active-rl-data/classifier',
+                                            writer=writer,
+                                            name=str(i_episode) + '/threshold',
+                                            duration=game.update)
                 # Evaluate on fixed set
-                fixed_set_evaluation(category, 'RL', i_episode, game.update)
+                fix_acc1, fix_sure_acc1 = fixed_set_evaluation(category, 'RL', i_episode, game.update)
+                writer.add_scalars(str(i_episode) + '/accuracy', {
+                    'train_acc1': train_acc1,
+                    'val_acc1': val_acc1,
+                    'test_acc1': test_acc1,
+                    'fix_acc1': fix_acc1,
+                    'fix_sure_acc1': fix_sure_acc1*100},
+                                   game.update)
+
+                writer.add_scalar(str(i_episode) + '/lr', lr, game.update)
 
                 # train_lsun_model(game, 'latest_LSUN', '/data3/floraxue/cs294/active-rl-data/classifier')
                 # test_lsun_model('latest_LSUN', '/data3/floraxue/cs294/active-rl-data/classifier')
@@ -192,6 +209,7 @@ def train_nsq(args, game, q_func):
                 # Read reward from difference from LSUN
                 reward, last_acc = calculate_reward(last_acc, category, i_episode, game.update)
                 game.current_reward = reward
+                writer.add_scalar(str(i_episode) + '/reward', reward, game.update)
                 logger.info('current reward in update {} of episode {} is {}'.format(
                     game.update, game.episode, game.current_reward))
                 reward_seq += [reward] * len(act_seq)
@@ -219,6 +237,18 @@ def train_nsq(args, game, q_func):
                 robot.target_q_function.load_state_dict(
                     robot.q_function.state_dict())
                 break
+
+
+def adjust_learning_rate(iter):
+    """ Sets the learning rate to the initial LR decayed by
+    10 every 30 epochs """
+    # lr = args.lr * (0.1 ** (epoch // 30))
+    if iter == 1:
+        return 5e-3
+    elif iter >= 4:
+        return 1e-4
+    else:
+        return 1e-3
 
 
 def main():

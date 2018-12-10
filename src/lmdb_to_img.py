@@ -90,8 +90,6 @@ def move_images(category):
                  if '.jpg' in fpath]
     train_names = all_names[:-10000]
     test_names = all_names[-10000:]
-    import pdb
-    pdb.set_trace()
     for name in train_names:
         src = join(img_out_dir, name)
         dst = join(train_dir, name)
