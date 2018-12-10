@@ -12,6 +12,7 @@ from game import VFGGAME
 from explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR_HOLDOUT, CLASSIFIER_ROOT_HOLDOUT
+from train_new import test_all
 from lsun import train_lsun_model, test_lsun_model_holdout, train_lsun_model_holdout
 
 import subprocess
@@ -142,15 +143,7 @@ def test_all_data_holdout(category, i_episode, mode):
     last_trial_key_path = join(MACHINE_LABEL_DIR_HOLDOUT, mode,
                                '{}_trial_{}_unsure.p'.format(category, trial - 1))
 
-    cmd = 'python3 train_new.py test_all -e {0} --trial {1}' \
-          '-m {2} --category {3} --model-file-dir {4}'.format(
-            last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
-
-    try:
-        subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
+    test_all(last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
 def main():
     args = parse_arguments()

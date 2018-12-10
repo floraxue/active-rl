@@ -9,6 +9,7 @@ import sys
 
 from dataset import FeatDataset, ImageData
 from train_new import MACHINE_LABEL_DIR_HOLDOUT, IMAGE_DIR_HOLDOUT, GT_PATH_HOLDOUT
+from train_new import train, test
 from util import logger
 
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
@@ -36,16 +37,8 @@ def train_lsun_model(game, train_mode, work_root):
         iters = 5000
         # iters = 50
 
-    cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
-          '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
-            train_keys_path, val_keys_path, save_dir, method, category, iters,
-            model_file_dir)
-
-    try:
-        subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
+    train(train_keys_path, val_keys_path, save_dir, method, category, iters,
+          model_file_dir)
 
 
 def test_lsun_model(test_mode, work_root):
@@ -58,15 +51,8 @@ def test_lsun_model(test_mode, work_root):
     os.makedirs(save_dir, exist_ok=True)
     method = 'resnet'
 
-    cmd = 'python3 train_new.py test -e {0} -s {1} ' \
-          '-m {2} --category {3}'.format(
-            test_keys_path, save_dir, method, category)
+    test(test_keys_path, save_dir, method, category)
 
-    try:
-        subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
 
 def test_lsun_model_holdout(test_mode, work_root):
     category = 'cat'
@@ -78,17 +64,10 @@ def test_lsun_model_holdout(test_mode, work_root):
     os.makedirs(save_dir, exist_ok=True)
     method = 'resnet'
 
-    cmd = 'python3 -m train_new.py test -e {0} -s {1} ' \
-          '-m {2} --category {3}'.format(
-            test_keys_path, save_dir, method, category)
+    test(test_keys_path, save_dir, method, category)
 
-    try:
-        subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
 
-#train once per iteration
+# train once per iteration
 def train_lsun_model_holdout(game, train_mode, work_root, new_key_path):
     load_keys_holdout(game, work_root, train_mode, new_key_path)
 
@@ -111,16 +90,9 @@ def train_lsun_model_holdout(game, train_mode, work_root, new_key_path):
         iters = 5000
         # iters = 50
 
-    cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
-          '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
-        train_keys_path, val_keys_path, save_dir, method, category, iters,
-        model_file_dir)
+    train(train_keys_path, val_keys_path, save_dir, method, category, iters,
+          model_file_dir)
 
-    try:
-        subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
 
 def load_keys(game, train_mode, work_root):
     work_dir = join(work_root, train_mode)
@@ -186,7 +158,8 @@ def load_keys(game, train_mode, work_root):
     pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
     pickle.dump(test_keys_all, open(test_keys_path, 'wb'))
 
-#work_root: classifier_holdout, test_mode: latest_LSUN
+
+# work_root: classifier_holdout, test_mode: latest_LSUN
 def load_keys_holdout(game, train_mode, work_root, new_key_path):
     work_dir = join(work_root, train_mode)
 

@@ -15,6 +15,7 @@ from game import VFGGAME
 from explorer import Explorer
 from util import logger
 from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
+from train_new import test_fixed_set, test_all
 import subprocess
 from lsun import train_lsun_model, test_lsun_model
 import random
@@ -71,6 +72,7 @@ def parse_arguments():
 
     return args
 
+
 def calculate_reward(last_acc, category, i_episode, update):
     """
     Calculate reward from LSUN and RL
@@ -80,6 +82,7 @@ def calculate_reward(last_acc, category, i_episode, update):
     rl_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_RL_{}.p'.format(prefix))
     rl_acc = pickle.load(open(rl_file, 'rb'))
     return rl_acc - last_acc, rl_acc
+
 
 def fixed_set_evaluation(category, mode, i_episode, update):
     """
@@ -94,15 +97,8 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     method = 'resnet'
     model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
     test_prefix = '{}_{}_episode_{:04d}_update_{:03d}'.format(mode, category, i_episode, update)
-    cmd = 'python3 train_new.py test_fixed -e {0} ' \
-          '-m {1} --category {2} --test-prefix {3} --model-file-dir {4}'.format(
-            test_keys_path, method, category, test_prefix, model_file_dir)
+    test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir)
 
-    try:
-        subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
 
 def test_all_data(category, i_episode):
     """
@@ -115,15 +111,7 @@ def test_all_data(category, i_episode):
     last_trial_key_path = join(MACHINE_LABEL_DIR,
                                '{}_trial_{}_unsure.p'.format(category, trial - 1))
 
-    cmd = 'python3 train_new.py test_all -e {0} --trial {1} ' \
-          '-m {2} --category {3} --model-file-dir {4}'.format(
-            last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
-
-    try:
-        subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError as exc:
-        print("Status : FAIL", exc.returncode, exc.output)
-        sys.exit(-1)
+    test_all(last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
 
 def train_nsq(args, game, q_func):
@@ -205,8 +193,8 @@ def train_nsq(args, game, q_func):
                 reward, last_acc = calculate_reward(last_acc, category, i_episode, game.update)
                 game.current_reward = reward
                 logger.info('current reward in update {} of episode {} is {}'.format(
-                            game.update, game.episode, game.current_reward))
-                reward_seq += [reward]*len(act_seq)
+                    game.update, game.episode, game.current_reward))
+                reward_seq += [reward] * len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
                             reward_seq, qvalue_seq, done_seq)
                 state_seq, act_seq, reward_seq = [], [], []
@@ -216,13 +204,13 @@ def train_nsq(args, game, q_func):
                 if len(memory) >= 5 * args.batch_size:
                     logger.info('updating robot')
                     _, _, next_state_batch, reward_batch, \
-                        qvalue_batch, not_done_batch = memory.sample(args.batch_size)
+                    qvalue_batch, not_done_batch = memory.sample(args.batch_size)
                     robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
 
             state = next_state
 
             if done:
-                episode_durations.append(t+1)
+                episode_durations.append(t + 1)
                 # propagate through the whole dataset and split
                 test_all_data(category, i_episode)
 
@@ -242,4 +230,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

@@ -37,62 +37,73 @@ CLASSIFIER_ROOT = '/data3/floraxue/cs294/active-rl-data/classifier'
 CLASSIFIER_ROOT_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/classifier_holdout'
 MACHINE_LABEL_DIR_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/machine_labels_holdout'
 
+# Default args
+CROP_SIZE = 224
+BATCH_SIZE = 256
+NUM_WORKERS = 30
+LR = 1e-3
+MOMENTUM = 0.9
+WEIGHT_DECAY = 1e-4
+PRINT_FREQ = 10
+EVAL_EVERY = 1000
 
-def args_parser():
-    parser = argparse.ArgumentParser(description='Pytorch training')
-    parser.add_argument('cmd', type=str, choices=['train', 'test', 'test_all', 'test_fixed'])
-    parser.add_argument('--train-keys', '-t', metavar='DIR',
-                        help='path to training dataset')
-    parser.add_argument('--eval-keys', '-e', metavar='DIR',
-                        help='path to eval datasets')
-    parser.add_argument('--save-dir', '-s', metavar='DIR', help='save dir')
-    parser.add_argument('--method', '-m', metavar='ARCH', default='resnet',
-                        help='model architecture:')
-    parser.add_argument('--category', '-ct', default='cat1', type=str,
-                        help='category')
-    parser.add_argument('--train-prefix', '-tp', default='', type=str,
-                        help='train prefix')
-    parser.add_argument('--trial', '-tt', default=0, type=int,
-                        help='current trial id')
-    parser.add_argument('--stage', '-st', default=0, type=int,
-                        help='stage id')
-    parser.add_argument('--test-prefix', default='RL_cat_ep_0_up_0', type=str,
-                        help='e.g. RL_cat_ep_1_up_1')
-    parser.add_argument('--model-file-dir', default='', type=str,
-                        help='trained model checkpoint')
-    parser.add_argument('--out-split-dir', type=str,
-                        help='dir to save results for test_all')
+# def args_parser():
+#     parser = argparse.ArgumentParser(description='Pytorch training')
+#     parser.add_argument('cmd', type=str, choices=['train', 'test', 'test_all', 'test_fixed'])
+#     parser.add_argument('--train-keys', '-t', metavar='DIR',
+#                         help='path to training dataset')
+#     parser.add_argument('--eval-keys', '-e', metavar='DIR',
+#                         help='path to eval datasets')
+#     parser.add_argument('--save-dir', '-s', metavar='DIR', help='save dir')
+#     parser.add_argument('--method', '-m', metavar='ARCH', default='resnet',
+#                         help='model architecture:')
+#     parser.add_argument('--category', '-ct', default='cat1', type=str,
+#                         help='category')
+#     parser.add_argument('--train-prefix', '-tp', default='', type=str,
+#                         help='train prefix')
+#     parser.add_argument('--trial', '-tt', default=0, type=int,
+#                         help='current trial id')
+#     parser.add_argument('--stage', '-st', default=0, type=int,
+#                         help='stage id')
+#     parser.add_argument('--test-prefix', default='RL_cat_ep_0_up_0', type=str,
+#                         help='e.g. RL_cat_ep_1_up_1')
+#     parser.add_argument('--model-file-dir', default='', type=str,
+#                         help='trained model checkpoint')
+#     parser.add_argument('--out-split-dir', type=str,
+#                         help='dir to save results for test_all')
+#
+#     # flags for training
+#     parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
+#                         help='number of data loading workers (default: 32)')
+#     parser.add_argument('--iters', default=15000, type=int, metavar='N',
+#                         help='number of total epochs to run')
+#     parser.add_argument('-b', '--batch-size', default=256, type=int,
+#                         metavar='N', help='mini-batch size (default: 256)')
+#     parser.add_argument('-c', '--crop-size', default=224, type=int,
+#                         metavar='N', help='image crop size (default: 224)')
+#     parser.add_argument('--lr', '--learning-rate', default=1e-2, type=float,
+#                         metavar='LR', help='initial learning rate')
+#     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
+#                         help='momentum')
+#     parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
+#                         metavar='W', help='weight decay (default: 1e-4)')
+#     parser.add_argument('--num-workers', type=int, default=30, metavar='N',
+#                         help='number of workers')
+#     parser.add_argument('--print-freq', type=int, default=10)
+#     parser.add_argument('--eval-every', type=int, default=1000)
+#     args = parser.parse_args()
+#
+#     return args
 
-    # flags for training
-    parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
-                        help='number of data loading workers (default: 32)')
-    parser.add_argument('--iters', default=15000, type=int, metavar='N',
-                        help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=256, type=int,
-                        metavar='N', help='mini-batch size (default: 256)')
-    parser.add_argument('-c', '--crop-size', default=224, type=int,
-                        metavar='N', help='image crop size (default: 224)')
-    parser.add_argument('--lr', '--learning-rate', default=1e-2, type=float,
-                        metavar='LR', help='initial learning rate')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                        help='momentum')
-    parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
-                        metavar='W', help='weight decay (default: 1e-4)')
-    parser.add_argument('--num-workers', type=int, default=30, metavar='N',
-                        help='number of workers')
-    parser.add_argument('--print-freq', type=int, default=10)
-    parser.add_argument('--eval-every', type=int, default=1000)
-    args = parser.parse_args()
 
-    return args
-
-def train(args):
+def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
+          model_file_dir):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = network.__dict__[args.method]()
+    model = network.__dict__[method]()
     model = torch.nn.DataParallel(model).to(device)
 
     # NEW load state_dict
-    model_path = join(args.model_file_dir, 'bal_model_best.pth.tar')
+    model_path = join(model_file_dir, 'bal_model_best.pth.tar')
     if exists(model_path):
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['state_dict'])
@@ -108,39 +119,39 @@ def train(args):
         model.load_state_dict(a)
 
     model.train()
-    logger.info('model {} has been initialized'.format(args.method))
+    logger.info('model {} has been initialized'.format(method))
 
     mean = np.array([0.49911337, 0.46108112, 0.42117174])
     std = np.array([0.29213443, 0.2912565, 0.2954716])
 
     normalize = transforms.Normalize(mean=mean, std=std)
     trans = transforms.Compose([
-        transforms.RandomResizedCrop(args.crop_size),
+        transforms.RandomResizedCrop(CROP_SIZE),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize])
     logger.info('creating train/val data loader')
     # train_prefix = args.train_prefix + '_train'
     train_loader = data.DataLoader(
-        ImageData(args.train_keys, IMAGE_DIR_TRAIN, GT_PATH,
-                  transform=trans), batch_size=args.batch_size,
-        num_workers=args.num_workers, shuffle=True, pin_memory=True)
+        ImageData(train_keys_path, IMAGE_DIR_TRAIN, GT_PATH,
+                  transform=trans), batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS, shuffle=True, pin_memory=True)
     # val_loader = data.DataLoader(
     #     ImageData(args.eval_keys, IMAGE_DIR, GT_PATH, transform=trans),
     #     batch_size=args.batch_size,
     #     num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
     val_bal_loader = data.DataLoader(
-        ImageData(args.eval_keys, IMAGE_DIR_TRAIN, GT_PATH, transform=trans),
-        batch_size=args.batch_size,
-        num_workers=args.num_workers, shuffle=False, pin_memory=True)
+        ImageData(val_keys_path, IMAGE_DIR_TRAIN, GT_PATH, transform=trans),
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS, shuffle=False, pin_memory=True)
     logger.info('finished creating data loaders')
 
     optim_params = model.parameters()
     criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.SGD(optim_params, args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
+    optimizer = torch.optim.SGD(optim_params, LR,
+                                momentum=MOMENTUM,
+                                weight_decay=WEIGHT_DECAY)
     # best_prec1_raw = 0
     best_prec1_bal = 0
 
@@ -160,7 +171,7 @@ def train(args):
         for j, (input, target, _) in enumerate(train_loader):
             data_time.update(time.time() - end)
             i = j + start
-            adjust_learning_rate(args, optimizer, i)
+            adjust_learning_rate(optimizer, i)
             # switch to train mode
             model.train()
             input = input.to(device)
@@ -184,7 +195,7 @@ def train(args):
             # measure elapsed time
             batch_time.update(time.time() - end)
 
-            if (i+1) % args.print_freq == 0:
+            if (i+1) % PRINT_FREQ == 0:
                 logger.info('Iter: [{}/{}]\t'
                             'Time {batch_time.val:.3f} '
                             '({batch_time.avg:.3f})\t'
@@ -194,10 +205,10 @@ def train(args):
                                 i+1, len(train_loader), batch_time=batch_time,
                                 data_time=data_time, loss=losses, top1=top1))
 
-            if (i+1) % args.eval_every == 0 or (i+1) == len(train_loader):
+            if (i+1) % EVAL_EVERY == 0 or (i+1) == len(train_loader):
                 # evaluation
                 # prec1_raw = validate(args.print_freq, val_loader, model, criterion, i)
-                prec1_bal = validate(args.print_freq, val_bal_loader, model, criterion, i)
+                prec1_bal = validate(PRINT_FREQ, val_bal_loader, model, criterion, i)
 
                 # is_best_raw = prec1_raw > best_prec1_raw
                 is_best_bal = prec1_bal > best_prec1_bal
@@ -205,11 +216,11 @@ def train(args):
                 # best_prec1_raw = max(prec1_raw, best_prec1_raw)
                 best_prec1_bal = max(prec1_bal, best_prec1_bal)
 
-                checkpoint_path = join(args.save_dir,
+                checkpoint_path = join(save_dir,
                                        'checkpoint_latest.pth.tar')
                 save_checkpoint({
                     'iters': i + 1,
-                    'arch': args.method,
+                    'arch': method,
                     'state_dict': model.state_dict(),
                     # 'best_prec1': [best_prec1_raw, best_prec1_bal],
                     'best_prec1': [best_prec1_bal],
@@ -217,7 +228,7 @@ def train(args):
                 # }, [is_best_raw, is_best_bal], filename=checkpoint_path)
                 }, [is_best_bal], filename=checkpoint_path)
                 history_path = join(
-                    args.save_dir,
+                    save_dir,
                     'checkpoint_{:05d}.pth.tar'.format(i + 1))
                 shutil.copyfile(checkpoint_path, history_path)
 
@@ -236,16 +247,16 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
         shutil.copyfile(filename, join(dirname, 'bal_model_best.pth.tar'))
 
 
-def adjust_learning_rate(args, optimizer, iter):
+def adjust_learning_rate(optimizer, iter):
     """ Sets the learning rate to the initial LR decayed by
     10 every 30 epochs """
     # lr = args.lr * (0.1 ** (epoch // 30))
     if 10000 <= iter < 20000:
-        lr = args.lr * 0.1
+        lr = LR * 0.1
     elif iter > 20000:
-        lr = args.lr * 0.01
+        lr = LR * 0.01
     else:
-        lr = args.lr
+        lr = LR
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
@@ -347,19 +358,19 @@ def validate(print_freq, val_loader, model, criterion, _iter, for_test=False):
         return top1.avg
 
 
-def test(args):
+def test(test_keys_path, save_dir, method, category):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = network.__dict__[args.method]()
+    model = network.__dict__[method]()
     model = torch.nn.DataParallel(model).to(device)
     model.eval()
-    logger.info('model {} has been initialized'.format(args.method))
+    logger.info('model {} has been initialized'.format(method))
 
     mean = np.array([0.49911337, 0.46108112, 0.42117174])
     std = np.array([0.29213443, 0.2912565, 0.2954716])
 
     normalize = transforms.Normalize(mean=mean, std=std)
     trans = transforms.Compose([
-        transforms.RandomResizedCrop(args.crop_size),
+        transforms.RandomResizedCrop(CROP_SIZE),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize])
@@ -368,9 +379,9 @@ def test(args):
     # the first stage will be using the full test data and for the later
     # stages, use the unknown part of the data for testing
     test_loader = data.DataLoader(
-        ImageData(args.eval_keys, IMAGE_DIR_TRAIN, GT_PATH,
-                  transform=trans), batch_size=args.batch_size,
-        num_workers=args.num_workers, shuffle=False, pin_memory=True)
+        ImageData(test_keys_path, IMAGE_DIR_TRAIN, GT_PATH,
+                  transform=trans), batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS, shuffle=False, pin_memory=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
 
@@ -379,16 +390,16 @@ def test(args):
     test_names = ['bal']
     split_results = []
     accuracies = []
-    work_dir = args.save_dir
+    work_dir = save_dir
     for i, tn in enumerate(test_names):
         logger.info('Try on the best model evaluated on {} data'.format(tn))
-        model_path = join(args.save_dir, '{}_model_best.pth.tar'.format(tn))
+        model_path = join(save_dir, '{}_model_best.pth.tar'.format(tn))
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['state_dict'])
         iteration = checkpoint['iters']
 
         prec1, scores, keys, labels = validate(
-            args.print_freq, test_loader, model, criterion, iteration, for_test=True)
+            PRINT_FREQ, test_loader, model, criterion, iteration, for_test=True)
 
         accuracies.append(prec1.item())
         test_labels = np.array(labels)
@@ -434,10 +445,9 @@ def test(args):
                   'recallPercentages': recall_percentages,
                   'total': len(test_labels),
                   'iteration': iteration,
-                  'method': args.method,
-                  'category': args.category,
-                  'crops': 1,
-                  'trials': args.train_prefix}
+                  'method': method,
+                  'category': category,
+                  'crops': 1}
 
         out_path = join(work_dir, 'split_{}_{}.json'.format(tn, iteration))
         with open(out_path, 'w') as fp:
@@ -477,7 +487,7 @@ def test(args):
     with open(out_path, 'w') as fp:
         json.dump(best_split, fp)
 
-    model_path = join(args.save_dir, '{}_model_best.pth.tar'.format(
+    model_path = join(save_dir, '{}_model_best.pth.tar'.format(
         best_split['name']))
     out_model_link = join(work_dir, 'split_model.pth.tar')
     if exists(out_model_link):
@@ -528,38 +538,38 @@ def test(args):
     #                 len(test_keys[2]))
 
 
-def test_fixed_set(args):
+def test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = network.__dict__[args.method]()
+    model = network.__dict__[method]()
     model = torch.nn.DataParallel(model).to(device)
     model.eval()
-    logger.info('model {} has been initialized'.format(args.method))
+    logger.info('model {} has been initialized'.format(method))
 
     mean = np.array([0.49911337, 0.46108112, 0.42117174])
     std = np.array([0.29213443, 0.2912565, 0.2954716])
 
     normalize = transforms.Normalize(mean=mean, std=std)
     trans = transforms.Compose([
-        transforms.RandomResizedCrop(args.crop_size),
+        transforms.RandomResizedCrop(CROP_SIZE),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize])
 
     # data loader
     test_loader = data.DataLoader(
-        ImageData(args.eval_keys, IMAGE_DIR_FIXED, GT_PATH,
-                  transform=trans), batch_size=args.batch_size,
-        num_workers=args.num_workers, shuffle=False, pin_memory=True)
+        ImageData(test_keys_path, IMAGE_DIR_FIXED, GT_PATH,
+                  transform=trans), batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS, shuffle=False, pin_memory=True)
 
     criterion = nn.CrossEntropyLoss().to(device)
 
     # run on the fixed set
-    work_dir = args.model_file_dir
+    work_dir = model_file_dir
     model_file = join(work_dir, 'split_model.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
     _iter = checkpoint['iters']
-    logger.info('loaded model {} at iteration {}'.format(args.method, _iter))
+    logger.info('loaded model {} at iteration {}'.format(method, _iter))
 
     split_file = join(work_dir, 'split.json')
     with open(split_file, 'r') as fp:
@@ -572,7 +582,7 @@ def test_fixed_set(args):
     # neg_thresh = 0.02
 
     prec1, scores, keys, labels = validate(
-        args.print_freq, test_loader, model, criterion, _iter, for_test=True)
+        PRINT_FREQ, test_loader, model, criterion, _iter, for_test=True)
 
     test_labels = np.array(labels)
     test_scores = np.array(scores)
@@ -593,40 +603,38 @@ def test_fixed_set(args):
             overall_correct += 1
 
     overall_acc = overall_correct / len(keys)
-    out_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_{}.p'.format(args.test_prefix))
+    out_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_{}.p'.format(test_prefix))
     pickle.dump(overall_acc, open(out_file, 'wb'))
     return overall_acc
 
 
-def test_all(args):
+def test_all(last_trial_key_path, trial, method, category, model_file_dir):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = network.__dict__[args.method]()
+    model = network.__dict__[method]()
     model = torch.nn.DataParallel(model).to(device)
     model.eval()
 
-    work_dir = args.model_file_dir
+    work_dir = model_file_dir
     model_file = join(work_dir, 'split_model.pth.tar')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
     _iter = checkpoint['iters']
-    logger.info('loaded model {} at iteration {}'.format(args.method, _iter))
+    logger.info('loaded model {} at iteration {}'.format(method, _iter))
 
     mean = np.array([0.49911337, 0.46108112, 0.42117174])
     std = np.array([0.29213443, 0.2912565, 0.2954716])
 
     normalize = transforms.Normalize(mean=mean, std=std)
     trans = transforms.Compose([
-        transforms.RandomResizedCrop(args.crop_size),
+        transforms.RandomResizedCrop(CROP_SIZE),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize])
 
-    args.batch_size = args.batch_size
-
     test_loader = data.DataLoader(
-        ImageData(args.eval_keys, IMAGE_DIR_TRAIN, GT_PATH,
-                  transform=trans), batch_size=args.batch_size,
-        num_workers=args.num_workers, shuffle=False, pin_memory=True)
+        ImageData(last_trial_key_path, IMAGE_DIR_TRAIN, GT_PATH,
+                  transform=trans), batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS, shuffle=False, pin_memory=True)
 
     split_file = join(work_dir, 'split.json')
     with open(split_file, 'r') as fp:
@@ -637,10 +645,6 @@ def test_all(args):
 
     # pos_thresh = 0.98
     # neg_thresh = 0.02
-
-    # TODO need to setup args properly with episode
-    category = args.category
-    trial = args.trial
 
     # out_file = join(result_dir, args.test_prefix+'_score.txt')
     # if exists(out_file):
@@ -677,7 +681,7 @@ def test_all(args):
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % args.print_freq == 0:
+            if i % PRINT_FREQ == 0:
                 logger.info('{}/{} batches have been evaluated, '
                             'batch time = {bt.val:.3f}s '
                             '({bt.avg:.3f})s'.format(
@@ -745,20 +749,20 @@ def test_all(args):
     #             img_cnt[0], img_cnt[1], img_cnt[2])
 
 
-if __name__ == '__main__':
-    args = args_parser()
-    if args.cmd == 'train':
-        logger.info('running training')
-        os.makedirs(args.save_dir, exist_ok=True)
-        train(args)
-    elif args.cmd == 'test':
-        logger.info('running testing')
-        test(args)
-    elif args.cmd == 'test_fixed':
-        logger.info('running test fixed set')
-        test_fixed_set(args)
-    elif args.cmd == 'test_all':
-        logger.info('running testing all')
-        test_all(args)
-    else:
-        raise NotImplementedError
+# if __name__ == '__main__':
+#     # args = args_parser()
+#     if args.cmd == 'train':
+#         logger.info('running training')
+#         os.makedirs(args.save_dir, exist_ok=True)
+#         train(args)
+#     elif args.cmd == 'test':
+#         logger.info('running testing')
+#         test(args)
+#     elif args.cmd == 'test_fixed':
+#         logger.info('running test fixed set')
+#         test_fixed_set(args)
+#     elif args.cmd == 'test_all':
+#         logger.info('running testing all')
+#         test_all(args)
+#     else:
+#         raise NotImplementedError

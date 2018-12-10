@@ -4,6 +4,7 @@ from collections import namedtuple
 import os
 from os.path import join, exists
 from train_new import IMAGE_DIR_TRAIN, CLASSIFIER_ROOT
+from train_new import train, test
 from torchvision import models, transforms
 import sys
 import torch
@@ -235,15 +236,8 @@ class VFGGAME:
             # iters = 50
             iters = 5000
 
-        cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
-              '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
-                train_keys_path, val_keys_path, save_dir, method, category, iters,
-                model_file_dir)
-        try:
-            subprocess.check_call(cmd, shell=True)
-        except subprocess.CalledProcessError as exc:
-            print("Status : FAIL", exc.returncode, exc.output)
-            sys.exit(-1)
+        train(train_keys_path, val_keys_path, save_dir, method, category,
+              iters, model_file_dir)
 
     def balance_labels(self, labels):
         pos_indices = np.nonzero(list(map(lambda x: x+1,labels)))[0]
@@ -294,15 +288,7 @@ class VFGGAME:
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
 
-        cmd = 'python3 train_new.py test -e {0} -s {1} ' \
-              '-m {2} --category {3}'.format(
-                test_keys_path, save_dir, method, category)
-
-        try:
-            subprocess.check_call(cmd, shell=True)
-        except subprocess.CalledProcessError as exc:
-            print("Status : FAIL", exc.returncode, exc.output)
-            sys.exit(-1)
+        test(test_keys_path, save_dir, method, category)
 
     # def write_list(self):
     #     """dumping the training list to file"""
