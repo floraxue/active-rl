@@ -36,17 +36,18 @@ class NSQ(object):
         self.gamma = gamma
         self.num_actions = num_actions
 
-    def act(self, feat):
+    def act(self, state):
         """
-        :param feat:
+        :param state:
         :return: action in one-hot encoding
         """
         sample = random.random()
         eps_threshold = self.explorer.value(self.t)
-        feat = torch.from_numpy(feat).unsqueeze(0).cuda()
-        qvalue, hidden_unit = self.q_function(feat)
+
+        state = torch.from_numpy(state).unsqueeze(0).cuda()
+        qvalue, hidden_unit = self.q_function(state)
         if sample > eps_threshold:
-            action_index = np.argmax(qvalue)
+            action_index = torch.argmax(qvalue)
         else:
             action_index = random.randrange(self.num_actions)
 

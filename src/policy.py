@@ -4,6 +4,7 @@ import torch.autograd as autograd
 import numpy as np
 import os
 import math
+from network import MLP
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -42,10 +43,10 @@ class PolicyNet(nn.Module):
     def init_hidden(self, bsz):
         h0 = torch.zeros(self.num_layers, bsz, self.hidden_size)
         c0 = torch.zeros(self.num_layers, bsz, self.hidden_size)
-        return h0, c0
+        return h0.cuda(), c0.cuda()
 
-    def reset_hidden(self, bsz):
-        self.hidden = self.init_hidden(bsz)
+    def reset_hidden(self):
+        self.hidden = None
 
     def forward(self, x):
         if len(x.size()) == 1:
@@ -54,12 +55,14 @@ class PolicyNet(nn.Module):
         else:
             bsz, fsz = x.size(0), x.size(1)
         x = x.resize(bsz, fsz, 1, 1)
+        # (1, 2048, 1, 1)
         orig_feat = x = self.conv(x)
-        x = self.bn(x)
+        #(1, 64, 1, 1)
+        # x = self.bn(x)
         x = self.relu(x)
         # sequence length is 1, (batch size, seq len, feat size)
         x = x.resize(bsz, 1, self.feat_size)
-
+        #(1, 1, 64)
         if self.hidden is None:
             self.hidden = self.init_hidden(bsz)
 
@@ -78,3 +81,11 @@ class PolicyNet(nn.Module):
         out = self.fc(out).squeeze()
 
         return out, self.hidden
+
+class NewPolicyNet(nn.Module):
+    def __init__(self, in_size, num_actions):
+        super().__init__()
+        self.network = MLP(in_dim=in_size, out_dim=num_actions)
+
+    def forward(self, x):
+        return self.network(x)

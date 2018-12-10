@@ -4,6 +4,9 @@ import numpy as np
 import pickle
 from collections import namedtuple
 import subprocess
+
+import sys
+
 from dataset import FeatDataset, ImageData
 from train_new import MACHINE_LABEL_DIR_HOLDOUT, IMAGE_DIR_HOLDOUT, GT_PATH_HOLDOUT
 from util import logger
@@ -27,19 +30,22 @@ def train_lsun_model(game, train_mode, work_root):
 
     # TODO set iters?
     if game.terminal:
-        # iters = 15000
-        iters = 15
+        iters = 15000
+        # iters = 100
     else:
-        # iters = 5000
-        iters = 5
+        iters = 5000
+        # iters = 50
 
-    cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
+    cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
           '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
             train_keys_path, val_keys_path, save_dir, method, category, iters,
             model_file_dir)
 
-    output = subprocess.check_output(cmd, shell=True,
-                                     stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 
 def test_lsun_model(test_mode, work_root):
@@ -52,12 +58,15 @@ def test_lsun_model(test_mode, work_root):
     os.makedirs(save_dir, exist_ok=True)
     method = 'resnet'
 
-    cmd = 'python3 -m vfg.label.train_new test -e {0} -s {1} ' \
+    cmd = 'python3 train_new.py test -e {0} -s {1} ' \
           '-m {2} --category {3}'.format(
             test_keys_path, save_dir, method, category)
 
-    output = subprocess.check_output(cmd, shell=True,
-                                     stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 def test_lsun_model_holdout(test_mode, work_root):
     category = 'cat'
@@ -69,12 +78,15 @@ def test_lsun_model_holdout(test_mode, work_root):
     os.makedirs(save_dir, exist_ok=True)
     method = 'resnet'
 
-    cmd = 'python3 -m vfg.label.train_new test -e {0} -s {1} ' \
+    cmd = 'python3 -m train_new.py test -e {0} -s {1} ' \
           '-m {2} --category {3}'.format(
             test_keys_path, save_dir, method, category)
 
-    output = subprocess.check_output(cmd, shell=True,
-                                     stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_call(cmd, shell=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 #train once per iteration
 def train_lsun_model_holdout(game, train_mode, work_root, new_key_path):
@@ -93,19 +105,22 @@ def train_lsun_model_holdout(game, train_mode, work_root, new_key_path):
 
     # TODO set iters?
     if game.terminal:
-        # iters = 15000
-        iters = 15
+        iters = 15000
+        # iters = 100
     else:
-        # iters = 5000
-        iters = 5
+        iters = 5000
+        # iters = 50
 
-    cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
+    cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
           '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
         train_keys_path, val_keys_path, save_dir, method, category, iters,
         model_file_dir)
 
-    output = subprocess.check_output(cmd, shell=True,
-                                     stderr=subprocess.STDOUT)
+    try:
+        subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+        sys.exit(-1)
 
 def load_keys(game, train_mode, work_root):
     work_dir = join(work_root, train_mode)
@@ -132,9 +147,12 @@ def load_keys(game, train_mode, work_root):
         past_test_keys = []
 
     # Sample LSUN chosen set
-    train_data= map(lambda x: Sample(*x), game.train_data[game.order[game.last: game.index]])
+    train_data = list(map(lambda x: Sample(*x), [game.train_data[k] for k in game.order[game.last: game.index]]))
     assert game.latest_num_train and game.latest_num_val and game.latest_num_test
-    chosen_set = np.random.choice(train_data, game.latest_curr_iter_num)
+    chosen_indices = np.random.choice(len(train_data),
+                                      game.latest_num_train + game.latest_num_val + game.latest_num_test,
+                                      replace=False)
+    chosen_set = [train_data[k] for k in chosen_indices]
 
     train_keys = []
     train_labels = []
@@ -195,10 +213,10 @@ def load_keys_holdout(game, train_mode, work_root, new_key_path):
 
     # Sample LSUN chosen set
 
-    dataset =  ImageData(key_path = new_key_path, image_dir = IMAGE_DIR_HOLDOUT, gt_path= GT_PATH_HOLDOUT)
+    dataset = ImageData(key_path = new_key_path, image_dir = IMAGE_DIR_HOLDOUT, gt_path= GT_PATH_HOLDOUT)
     order = np.random.permutation(range(len(dataset)))
 
-    chosen_set= map(lambda x: Sample(*x), dataset[order[:game.budget]])
+    chosen_set = list(map(lambda x: Sample(*x), [dataset[k] for k in order[:game.budget]]))
     assert game.latest_num_train and game.latest_num_val and game.latest_num_test
 
     train_keys = []

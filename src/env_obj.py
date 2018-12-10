@@ -18,31 +18,31 @@ class Env(object):
         if self.work_dir is None:
             try:
                 self.work_dir = os.environ['VFGDIR']
-                logger.info('Using VFGDIR {} defined in shell.'.format(
-                    self.work_dir))
+                # logger.info('Using VFGDIR {} defined in shell.'.format(
+                #     self.work_dir))
             except KeyError:
                 self.work_dir = './vfgdata'
-                logger.info('No work_dir is not set. Use {} instead.'.format(
-                    self.work_dir))
+                # logger.info('No work_dir is not set. Use {} instead.'.format(
+                #     self.work_dir))
         else:
             logger.info('Use work_dir: {}'.format(self.work_dir))
         if self.test:
             self.work_dir = join(self.work_dir, 'test')
         try:
             self.rname = os.environ['EXPNAME']
-            logger.info('Using EXPNAME {} defined in shell'.format(self.rname))
+            # logger.info('Using EXPNAME {} defined in shell'.format(self.rname))
         except KeyError:
             self.rname = 'new_iter'
-            logger.info('No EXPNAME is defined. Use default {}.'.format(
-                self.rname))
+            # logger.info('No EXPNAME is defined. Use default {}.'.format(
+            #     self.rname))
         try:
             self.remote_host_name = os.environ['REMOTE']
-            logger.info('Using REMOTE {} defined in shell'.format(
-                self.remote_host_name))
+            # logger.info('Using REMOTE {} defined in shell'.format(
+            #     self.remote_host_name))
         except KeyError:
             self.remote_host_name = 'floraxue@aspidochelone.ist.berkeley.edu'
-            logger.info('No REMOTE is defined. Use {} instead'.
-                        format(self.remote_host_name))
+            # logger.info('No REMOTE is defined. Use {} instead'.
+            #             format(self.remote_host_name))
         checkdir(self.work_dir)
 
     def workspace(self):

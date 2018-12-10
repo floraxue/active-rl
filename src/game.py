@@ -3,12 +3,27 @@ import subprocess
 from collections import namedtuple
 import os
 from os.path import join, exists
+from train_new import IMAGE_DIR_TRAIN, CLASSIFIER_ROOT
+from torchvision import models, transforms
+import sys
+import torch
+
 from util import logger
-from dataset import FeatDataset
+from dataset import FeatDataset, ImageData
 import pickle
+import torch.nn.functional as F
+import torch.utils.data as data
+import torch.utils.model_zoo as model_zoo
 
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 
+model_urls = {
+    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
+    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
+    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
+    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
+    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
+}
 
 class VFGGAME:
 
@@ -20,6 +35,10 @@ class VFGGAME:
         self.train_data = FeatDataset(key_path=self.key_path,
                                       feat_dir=self.feat_dir,
                                       gt_path=self.gt_path)
+
+        self.image_data = ImageData(key_path = self.key_path,
+                                    image_dir = IMAGE_DIR_TRAIN,
+                                    gt_path=self.gt_path)
 
         # decide the querying order
         self.order = np.random.permutation(range(len(self.train_data)))
@@ -81,13 +100,45 @@ class VFGGAME:
         self.current_reward = 0
 
     def sample(self):
-        """ return the feature of the current sample """
+        """ return the state of the current image """
         item = self.train_data[self.order[self.index]]
         self.current_sample = Sample(*item)
-        return self.current_sample.feat
+        feat = np.array(self.current_sample.feat)
+        img = self.image_data[self.order[self.index]][0]
+        mean = np.array([0.49911337, 0.46108112, 0.42117174])
+        std = np.array([0.29213443, 0.2912565, 0.2954716])
+
+        normalize = transforms.Normalize(mean=mean, std=std)
+        trans = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.ToTensor(),
+            normalize])
+
+        prob = self.get_prob(trans(img)).data.cpu().numpy()
+        x = np.concatenate((feat, prob))
+        return x
+
+    def get_prob(self, image):
+        curr_model_path = join(CLASSIFIER_ROOT, "latest_RL", "snapshots", 'bal_model_best.pth.tar')
+        model = models.resnet18(pretrained=False, num_classes = 2)
+        model = torch.nn.DataParallel(model).cuda()
+        if exists(curr_model_path):
+            checkpoint = torch.load(curr_model_path)["state_dict"]
+        else:
+            checkpoint = model_zoo.load_url(model_urls['resnet18'])
+            checkpoint.pop('fc.weight')
+            checkpoint.pop('fc.bias')
+        model.load_state_dict(checkpoint)
+
+        model.eval()
+        output = model(image.unsqueeze(0))
+        softmax_ = F.softmax(output, dim=-1)
+        if len(softmax_.size()) == 2:
+            softmax_ = softmax_[0]
+        return softmax_
 
     def step(self, action):
-        if self.chosen == self.budget:
+        if self.chosen == self.budget or self.index == len(self.train_data) - 1:
             self.terminal = True
 
         if action > 0:
@@ -147,10 +198,12 @@ class VFGGAME:
         val_keys = self.chosen_val['key']
         val_labels = self.chosen_val['gt']
 
-        train_order = self.balance_labels(train_labels)
-        train_keys_curr = [train_keys[i] for i in train_order]
-        val_bal_order = self.balance_labels(val_labels)
-        val_bal_keys_curr = [val_keys[i] for i in val_bal_order]
+        # train_order = self.balance_labels(train_labels)
+        # train_keys_curr = [train_keys[i] for i in train_order]
+        # val_bal_order = self.balance_labels(val_labels)
+        # val_bal_keys_curr = [val_keys[i] for i in val_bal_order]
+        train_keys_curr = train_keys
+        val_bal_keys_curr = val_keys
 
         # TODO: assume we don't need val keys before bal
         train_keys_all = train_keys_curr + past_train_keys
@@ -170,23 +223,25 @@ class VFGGAME:
 
         # TODO set iters?
         if self.terminal:
-            # iters = 15000
-            iters = 15
+            # iters = 100
+            iters = 15000
         else:
-            # iters = 5000
-            iters = 5
+            # iters = 50
+            iters = 5000
 
-        cmd = 'python3 -m vfg.label.train_new train -t {0} -e {1} -s {2} ' \
+        cmd = 'python3 train_new.py train -t {0} -e {1} -s {2} ' \
               '-m {3} --category {4} --iters {5} --model-file-dir {6}'.format(
                 train_keys_path, val_keys_path, save_dir, method, category, iters,
                 model_file_dir)
-
-        output = subprocess.check_output(cmd, shell=True,
-                                         stderr=subprocess.STDOUT)
+        try:
+            subprocess.check_call(cmd, shell=True)
+        except subprocess.CalledProcessError as exc:
+            print("Status : FAIL", exc.returncode, exc.output)
+            sys.exit(-1)
 
     def balance_labels(self, labels):
-        pos_indices = np.nonzero(labels > 0)[0]
-        neg_indices = np.nonzero(labels <= 0)[0]
+        pos_indices = np.nonzero(list(map(lambda x: x+1,labels)))[0]
+        neg_indices = np.nonzero(list(map(lambda x: x-1 ,labels)))[0]
         num_pos = pos_indices.size
         num_neg = neg_indices.size
         num_half = max(num_pos, num_neg)
@@ -233,12 +288,15 @@ class VFGGAME:
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
 
-        cmd = 'python3 -m vfg.label.train_new test -e {0} -s {1} ' \
+        cmd = 'python3 train_new.py test -e {0} -s {1} ' \
               '-m {2} --category {3}'.format(
                 test_keys_path, save_dir, method, category)
 
-        output = subprocess.check_output(cmd, shell=True,
-                                         stderr=subprocess.STDOUT)
+        try:
+            subprocess.check_call(cmd, shell=True)
+        except subprocess.CalledProcessError as exc:
+            print("Status : FAIL", exc.returncode, exc.output)
+            sys.exit(-1)
 
     # def write_list(self):
     #     """dumping the training list to file"""
