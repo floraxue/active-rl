@@ -17,6 +17,7 @@ from util import logger
 from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 import subprocess
 from lsun import train_lsun_model, test_lsun_model
+import random
 
 
 def parse_arguments():
@@ -174,6 +175,7 @@ def train_nsq(args, game, q_func):
         next_state_seq, qvalue_seq, done_seq = [], [], []
         for t in count():
             action, qvalue = robot.act(state)
+            # action, qvalue = random.randrange(num_actions), 0
             reward, next_state, done = game.step(action)
             state_seq += [state]
             act_seq += [action]

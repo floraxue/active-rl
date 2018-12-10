@@ -70,7 +70,7 @@ def args_parser():
                         metavar='N', help='mini-batch size (default: 256)')
     parser.add_argument('-c', '--crop-size', default=224, type=int,
                         metavar='N', help='image crop size (default: 224)')
-    parser.add_argument('--lr', '--learning-rate', default=5e-4, type=float,
+    parser.add_argument('--lr', '--learning-rate', default=1e-2, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                         help='momentum')
@@ -566,8 +566,8 @@ def test_fixed_set(args):
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
 
-    pos_thresh = 0.98
-    neg_thresh = 0.02
+    # pos_thresh = 0.98
+    # neg_thresh = 0.02
 
     prec1, scores, keys, labels = validate(
         args.print_freq, test_loader, model, criterion, _iter, for_test=True)
@@ -576,7 +576,8 @@ def test_fixed_set(args):
     test_scores = np.array(scores)
 
     overall_correct = 0
-
+    import pdb
+    pdb.set_trace()
     for index in range(len(keys)):
         # p = 0 negative, p = 2 positive
         p = int(test_scores[index] > pos_thresh) + \
@@ -632,8 +633,8 @@ def test_all(args):
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
 
-    pos_thresh = 0.98
-    neg_thresh = 0.02
+    # pos_thresh = 0.98
+    # neg_thresh = 0.02
 
     # TODO need to setup args properly with episode
     category = args.category
