@@ -59,8 +59,8 @@ def extract_feats(args):
     feat_model = nn.Sequential(*list(model.children())[:-1])
     feat_model = torch.nn.DataParallel(feat_model).to(device)
 
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=[0.49911337, 0.46108112, 0.42117174],
+                                     std=[0.29213443, 0.2912565, 0.2954716])
 
     transform_train = transforms.Compose([
         transforms.RandomResizedCrop(224),

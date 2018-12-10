@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
+import torch.utils.model_zoo as model_zoo
 import time
 import argparse
 from dataset import ImageData
@@ -17,6 +18,13 @@ import numpy as np
 import json
 import pickle
 
+model_urls = {
+    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
+    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
+    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
+    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
+    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
+}
 
 env = Env()
 IMAGE_DIR_TRAIN = '/data3/floraxue/cs294/active-rl-data/data/images/train/cat'
@@ -86,6 +94,16 @@ def train(args):
     if exists(model_path):
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['state_dict'])
+    else:
+        checkpoint = model_zoo.load_url(model_urls['resnet18'])
+        checkpoint.pop('fc.weight')
+        checkpoint.pop('fc.bias')
+        for k in list(checkpoint.keys())[:]:
+            checkpoint['module.' + k] = checkpoint[k]
+            checkpoint.pop(k)
+        a = model.state_dict()
+        a.update(checkpoint)
+        model.load_state_dict(a)
 
     model.train()
     logger.info('model {} has been initialized'.format(args.method))
@@ -135,7 +153,7 @@ def train(args):
     # logger.info('actual training iters = {}'.format(actual_iters))
     # args.iters = actual_iters
 
-    for start in range(0, args.iters, len(train_loader)):
+    for start in range(0, len(train_loader), len(train_loader)):
         end = time.time()
         for j, (input, target, _) in enumerate(train_loader):
             data_time.update(time.time() - end)
@@ -171,10 +189,10 @@ def train(args):
                             'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                             'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                             'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                                i+1, args.iters, batch_time=batch_time,
+                                i+1, len(train_loader), batch_time=batch_time,
                                 data_time=data_time, loss=losses, top1=top1))
 
-            if (i+1) % args.eval_every == 0 or (i+1) == args.iters:
+            if (i+1) % args.eval_every == 0 or (i+1) == len(train_loader):
                 # evaluation
                 # prec1_raw = validate(args.print_freq, val_loader, model, criterion, i)
                 prec1_bal = validate(args.print_freq, val_bal_loader, model, criterion, i)
@@ -203,7 +221,7 @@ def train(args):
 
             end = time.time()
 
-            if (i+1) == args.iters:
+            if (i+1) == len(train_loader):
                 break
 
 

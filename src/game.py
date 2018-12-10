@@ -124,11 +124,17 @@ class VFGGAME:
         model = torch.nn.DataParallel(model).cuda()
         if exists(curr_model_path):
             checkpoint = torch.load(curr_model_path)["state_dict"]
+            model.load_state_dict(checkpoint)
         else:
             checkpoint = model_zoo.load_url(model_urls['resnet18'])
             checkpoint.pop('fc.weight')
             checkpoint.pop('fc.bias')
-        model.load_state_dict(checkpoint)
+            for k in list(checkpoint.keys())[:]:
+                checkpoint['module.'+k] = checkpoint[k]
+                checkpoint.pop(k)
+            a = model.state_dict()
+            a.update(checkpoint)
+            model.load_state_dict(a)
 
         model.eval()
         output = model(image.unsqueeze(0))
@@ -138,7 +144,7 @@ class VFGGAME:
         return softmax_
 
     def step(self, action):
-        if self.chosen == self.budget or self.index == len(self.train_data) - 1:
+        if self.chosen == self.budget or self.index == len(self.train_data) - 2:
             self.terminal = True
 
         if action > 0:

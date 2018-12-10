@@ -74,5 +74,6 @@ class BinaryModel(nn.Module):
 
 
 def resnet():
-    model = models.resnet18(pretrained=True,num_classes = 2)
+    model = models.resnet18(pretrained=False,num_classes = 2)
+
     return model
