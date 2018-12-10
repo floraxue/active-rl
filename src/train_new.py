@@ -41,11 +41,11 @@ MACHINE_LABEL_DIR_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/machine_labels
 CROP_SIZE = 224
 BATCH_SIZE = 256
 NUM_WORKERS = 30
-LR = 1e-3
 MOMENTUM = 0.9
 WEIGHT_DECAY = 1e-4
 PRINT_FREQ = 10
 EVAL_EVERY = 1000
+
 
 # def args_parser():
 #     parser = argparse.ArgumentParser(description='Pytorch training')
@@ -97,7 +97,7 @@ EVAL_EVERY = 1000
 
 
 def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
-          model_file_dir):
+          model_file_dir, LR):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = network.__dict__[method]()
     model = torch.nn.DataParallel(model).to(device)
@@ -171,7 +171,7 @@ def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
         for j, (input, target, _) in enumerate(train_loader):
             data_time.update(time.time() - end)
             i = j + start
-            adjust_learning_rate(optimizer, i)
+            # adjust_learning_rate(optimizer, i)
             # switch to train mode
             model.train()
             input = input.to(device)
@@ -195,17 +195,17 @@ def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
             # measure elapsed time
             batch_time.update(time.time() - end)
 
-            if (i+1) % PRINT_FREQ == 0:
+            if (i + 1) % PRINT_FREQ == 0:
                 logger.info('Iter: [{}/{}]\t'
                             'Time {batch_time.val:.3f} '
                             '({batch_time.avg:.3f})\t'
                             'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                             'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                             'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                                i+1, len(train_loader), batch_time=batch_time,
-                                data_time=data_time, loss=losses, top1=top1))
+                    i + 1, len(train_loader), batch_time=batch_time,
+                    data_time=data_time, loss=losses, top1=top1))
 
-            if (i+1) % EVAL_EVERY == 0 or (i+1) == len(train_loader):
+            if (i + 1) % EVAL_EVERY == 0 or (i + 1) == len(train_loader):
                 # evaluation
                 # prec1_raw = validate(args.print_freq, val_loader, model, criterion, i)
                 prec1_bal = validate(PRINT_FREQ, val_bal_loader, model, criterion, i)
@@ -225,7 +225,7 @@ def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
                     # 'best_prec1': [best_prec1_raw, best_prec1_bal],
                     'best_prec1': [best_prec1_bal],
                     'optimizer': optimizer.state_dict(),
-                # }, [is_best_raw, is_best_bal], filename=checkpoint_path)
+                    # }, [is_best_raw, is_best_bal], filename=checkpoint_path)
                 }, [is_best_bal], filename=checkpoint_path)
                 history_path = join(
                     save_dir,
@@ -234,8 +234,8 @@ def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
 
             end = time.time()
 
-            if (i+1) == len(train_loader):
-                break
+            if (i + 1) == len(train_loader):
+                return top1.avg, prec1_bal
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
@@ -245,21 +245,6 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     #     shutil.copyfile(filename, join(dirname, 'raw_model_best.pth.tar'))
     if is_best[0]:  # bal data
         shutil.copyfile(filename, join(dirname, 'bal_model_best.pth.tar'))
-
-
-def adjust_learning_rate(optimizer, iter):
-    """ Sets the learning rate to the initial LR decayed by
-    10 every 30 epochs """
-    # lr = args.lr * (0.1 ** (epoch // 30))
-    if 10000 <= iter < 20000:
-        lr = LR * 0.1
-    elif iter > 20000:
-        lr = LR * 0.01
-    else:
-        lr = LR
-
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
 
 
 class AverageMeter(object):
@@ -344,11 +329,11 @@ def validate(print_freq, val_loader, model, criterion, _iter, for_test=False):
                             '({batch_time.avg:.3f})\t'
                             'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                             'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                                i, len(val_loader), batch_time=batch_time,
-                                loss=losses, top1=top1))
+                    i, len(val_loader), batch_time=batch_time,
+                    loss=losses, top1=top1))
 
         logger.info('[Iter {}] * Prec@1 {top1.avg:.3f}'.format(
-            _iter+1, top1=top1))
+            _iter + 1, top1=top1))
 
     if for_test:
         scores = torch.cat(scores)
@@ -358,7 +343,7 @@ def validate(print_freq, val_loader, model, criterion, _iter, for_test=False):
         return top1.avg
 
 
-def test(test_keys_path, save_dir, method, category):
+def test(test_keys_path, save_dir, method, category, writer, name, duration):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = network.__dict__[method]()
     model = torch.nn.DataParallel(model).to(device)
@@ -449,6 +434,17 @@ def test(test_keys_path, save_dir, method, category):
                   'category': category,
                   'crops': 1}
 
+        writer.add_scalars(name,
+                           {'posCut': pos_cut, 'posRatio': pos_cut / len(test_labels),
+                            'posThresh': pos_thresh,
+                            'negCut': neg_cut, 'negRatio': neg_cut / len(test_labels),
+                            'negThresh': neg_thresh,
+                            'recallCuts': recall_cuts,
+                            'recallThresholds': recall_thresholds,
+                            'recallPercentages': recall_percentages,
+                            'total': len(test_labels)
+                            }, duration)
+
         out_path = join(work_dir, 'split_{}_{}.json'.format(tn, iteration))
         with open(out_path, 'w') as fp:
             json.dump(result, fp)
@@ -493,7 +489,8 @@ def test(test_keys_path, save_dir, method, category):
     if exists(out_model_link):
         os.remove(out_model_link)
     os.symlink(model_path, out_model_link)
-
+    # return the test accuracy
+    return accuracies[0]
     # if env.mode() != 'LSUN':
     #     pred_path = join(work_dir, 'test_predictions_{}_{}.txt'.format(
     #         best_split['name'], best_split['iteration']))
@@ -588,8 +585,6 @@ def test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir
     test_scores = np.array(scores)
 
     overall_correct = 0
-    import pdb
-    pdb.set_trace()
     for index in range(len(keys)):
         # p = 0 negative, p = 2 positive
         p = int(test_scores[index] > pos_thresh) + \
@@ -605,7 +600,7 @@ def test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir
     overall_acc = overall_correct / len(keys)
     out_file = join(CLASSIFIER_ROOT, 'fixed_set_acc_{}.p'.format(test_prefix))
     pickle.dump(overall_acc, open(out_file, 'wb'))
-    return overall_acc
+    return prec1, overall_acc
 
 
 def test_all(last_trial_key_path, trial, method, category, model_file_dir):
@@ -665,7 +660,7 @@ def test_all(last_trial_key_path, trial, method, category, model_file_dir):
     scores, keys, labels = [], [], []
     with torch.no_grad():
         end = time.time()
-        for i,  (input, target, key) in enumerate(test_loader):
+        for i, (input, target, key) in enumerate(test_loader):
             input = input.to(device)
             output = model(input)
             softmax_ = F.softmax(output, dim=-1)
@@ -685,7 +680,7 @@ def test_all(last_trial_key_path, trial, method, category, model_file_dir):
                 logger.info('{}/{} batches have been evaluated, '
                             'batch time = {bt.val:.3f}s '
                             '({bt.avg:.3f})s'.format(
-                                i, len(test_loader), bt=batch_time))
+                    i, len(test_loader), bt=batch_time))
             # if (i+1) % 100 == 0 or (i+1) == len(test_loader):
             #     logger.info('[{}] Writing {}'.format((i+1)//100, out_file))
             #     scores = torch.cat(scores)
@@ -747,7 +742,6 @@ def test_all(last_trial_key_path, trial, method, category, model_file_dir):
     # shutil.copyfile(split_file, out_split_path)
     # logger.info('# images: %d %d %d',
     #             img_cnt[0], img_cnt[1], img_cnt[2])
-
 
 # if __name__ == '__main__':
 #     # args = args_parser()

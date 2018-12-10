@@ -178,7 +178,7 @@ class VFGGAME:
 
         return self.current_reward, next_state, self.terminal
 
-    def train_model(self, train_mode, work_root):
+    def train_model(self, train_mode, work_root, lr):
         category = self.category
         # train_prefix = 'RL_{}_episode_{:04d}_update_{:03d}'.format(
         #     category, self.episode, self.update)
@@ -236,12 +236,12 @@ class VFGGAME:
             # iters = 50
             iters = 5000
 
-        train(train_keys_path, val_keys_path, save_dir, method, category,
-              iters, model_file_dir)
+        return train(train_keys_path, val_keys_path, save_dir, method, category,
+              iters, model_file_dir, lr)
 
     def balance_labels(self, labels):
         pos_indices = np.nonzero(list(map(lambda x: x+1,labels)))[0]
-        neg_indices = np.nonzero(list(map(lambda x: x-1 ,labels)))[0]
+        neg_indices = np.nonzero(list(map(lambda x: x-1,labels)))[0]
         num_pos = pos_indices.size
         num_neg = neg_indices.size
         num_half = max(num_pos, num_neg)
@@ -261,7 +261,7 @@ class VFGGAME:
         new_indices = new_indices[order]
         return new_indices
 
-    def test_model(self, test_mode, work_root):
+    def test_model(self, test_mode, work_root, writer, name, duration):
         category = self.category
         # test_prefix = '{}_episode_{:04d}_update_{:03d}_RL'.format(
         #     category, self.episode, self.update)
@@ -288,7 +288,7 @@ class VFGGAME:
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
 
-        test(test_keys_path, save_dir, method, category)
+        return test(test_keys_path, save_dir, method, category, writer, name, duration)
 
     # def write_list(self):
     #     """dumping the training list to file"""
