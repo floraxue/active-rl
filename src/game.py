@@ -9,7 +9,7 @@ from torchvision import models, transforms
 import sys
 import torch
 
-from util import logger
+from util import logger, checkdir
 from dataset import FeatDataset, ImageData
 import pickle
 import torch.nn.functional as F
@@ -182,10 +182,10 @@ class VFGGAME:
         category = self.category
         # train_prefix = 'RL_{}_episode_{:04d}_update_{:03d}'.format(
         #     category, self.episode, self.update)
-        work_dir = join(work_root, train_mode)
+        work_dir = checkdir(join(work_root, train_mode))
 
-        train_keys_path = join(work_dir, 'loader', 'train_keys.p')
-        val_keys_path = join(work_dir, 'loader', 'val_keys.p')
+        train_keys_path = join(checkdir(join(work_dir, 'loader')), 'train_keys.p')
+        val_keys_path = join(checkdir(join(work_dir, 'loader')), 'val_keys.p')
         past_train_keys_path = join(work_root, 'past_train_keys.p')
         past_val_keys_path = join(work_root, 'past_val_keys.p')
 
@@ -227,7 +227,7 @@ class VFGGAME:
         pickle.dump(train_keys_curr + past_train_keys_curr, open(train_keys_path, 'wb'))
         pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
 
-        save_dir = join(work_dir, 'snapshots')
+        save_dir = checkdir(join(work_dir, 'snapshots'))
         model_file_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
@@ -269,9 +269,9 @@ class VFGGAME:
         category = self.category
         # test_prefix = '{}_episode_{:04d}_update_{:03d}_RL'.format(
         #     category, self.episode, self.update)
-        work_dir = join(work_root, test_mode)
+        work_dir = checkdir(join(work_root, test_mode))
 
-        test_keys_path = join(work_dir, 'loader', 'test_keys.p')
+        test_keys_path = join(checkdir(join(work_dir, 'loader')), 'test_keys.p')
         past_test_keys_path = join(work_root, 'past_test_keys.p')
 
         # Load past test keys
@@ -288,7 +288,7 @@ class VFGGAME:
         # Save past test keys for next time to use
         pickle.dump(test_keys_all, open(past_test_keys_path, 'wb'))
 
-        save_dir = join(work_dir, 'snapshots')
+        save_dir = checkdir(join(work_dir, 'snapshots'))
         os.makedirs(save_dir, exist_ok=True)
         method = 'resnet'
 
