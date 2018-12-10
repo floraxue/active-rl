@@ -44,6 +44,20 @@ def read_keys():
     keys_fixed = pos_keys_fixed + neg_keys_fixed
     keys_holdout = pos_keys_holdout + neg_keys_holdout
 
+    """
+    Also needs...
+    >>> import pickle
+    >>> unsure = pickle.load(open('cat_trial_0_unsure.p', 'rb'))
+    >>> len(unsure)
+    26000
+    >>> past = unsure[:500] + unsure[-500:]
+    >>> len(past)
+    1000
+    >>> unsure = unsure[500:-500]
+    >>> pickle.dump(unsure, open('cat_trial_0_unsure.p','wb'))
+    >>> pickle.dump(past, open('past_train_keys.p', 'wb'))
+    """
+
     pickle.dump(keys_train, open(join(POOL_DIR, 'cat_train_keys.p'), 'wb'))
     pickle.dump(keys_fixed, open(join(POOL_DIR, 'cat_fixed_keys.p'), 'wb'))
     pickle.dump(keys_holdout, open(join(POOL_DIR, 'cat_holdout_keys.p'), 'wb'))
