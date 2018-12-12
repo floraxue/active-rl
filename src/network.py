@@ -23,7 +23,6 @@ class MLP(nn.Module):
                 nn.init.constant(m.bias, 0)
 
     def forward(self, x):
-        x = x.squeeze()
         x = self.drop(self.relu(self.fc1(x)))
         x = self.fc2(x)
         return x

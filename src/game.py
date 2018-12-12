@@ -15,6 +15,7 @@ import pickle
 import torch.nn.functional as F
 import torch.utils.data as data
 import torch.utils.model_zoo as model_zoo
+from train_new import MACHINE_LABEL_DIR
 
 Sample = namedtuple('Sample', ('feat', 'label', 'key'))
 
@@ -193,7 +194,7 @@ class VFGGAME:
         if exists(past_train_keys_path):
             past_train_keys = pickle.load(open(past_train_keys_path, 'rb'))
         else:
-            initial_train_keys_path = join(work_root, 'initial_trial_keys.p')
+            initial_train_keys_path = join('/data3/floraxue/cs294/active-rl-data', 'initial_trial_keys.p')
             past_train_keys = pickle.load(open(initial_train_keys_path, 'rb'))
 
         if exists(past_val_keys_path):
@@ -223,7 +224,7 @@ class VFGGAME:
         pickle.dump(val_keys_all, open(past_val_keys_path, 'wb'))
 
         #use only a portion of the past_train_keys for this time
-        past_train_keys_curr = np.random.choice(past_train_keys, size=len(past_train_keys)//5, replace = False).tolist()
+        past_train_keys_curr = np.random.choice(past_train_keys, size=len(past_train_keys)//50, replace = False).tolist()
         pickle.dump(train_keys_curr + past_train_keys_curr, open(train_keys_path, 'wb'))
         pickle.dump(val_keys_all, open(val_keys_path, 'wb'))
 

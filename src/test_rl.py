@@ -15,9 +15,6 @@ from train_new import MACHINE_LABEL_DIR_HOLDOUT, CLASSIFIER_ROOT_HOLDOUT
 from train_new import test_all
 from lsun import train_lsun_model, test_lsun_model_holdout, train_lsun_model_holdout
 
-import subprocess
-
-
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
     parser.add_argument('--category', type=str, default='cat',

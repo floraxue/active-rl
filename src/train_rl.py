@@ -20,13 +20,13 @@ import random
 from tensorboardX import SummaryWriter
 
 writer = SummaryWriter('runs/')
-
+exp = ''
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
     parser.add_argument('--category', type=str, default='cat',
                         help='image category')
-    parser.add_argument('--budget', type=int, default=2000,
+    parser.add_argument('--budget', type=int, default=100,
                         help='maximum number of examples for human annotation')
     parser.add_argument('--eps-start', type=float, default=0.9,
                         help='starting epsilon')
@@ -36,14 +36,14 @@ def parse_arguments():
                         help='decay steps')
     parser.add_argument('--gamma', type=float, default=0.999,
                         help='discount factor')
-    parser.add_argument('--duration', '-k', type=int, default=100,
+    parser.add_argument('--duration', '-k', type=int, default=20,
                         help='get reward every k steps')
-    parser.add_argument('--batch-size', type=int, default=2048,
+    parser.add_argument('--batch-size', type=int, default=1,
                         help='batch size')
     parser.add_argument('--target-update', '-T', type=int, default=1000,
                         help='update target network every T steps')
     parser.add_argument('--learning-start', type=int, default=50000)
-    parser.add_argument('--buffer-size', type=int, default=100000)
+    parser.add_argument('--buffer-size', type=int, default=1000000)
     parser.add_argument('--num-actions', type=int, default=2,
                         help='default action is `keep` or `drop`')
     parser.add_argument('--input_dim', type=int, default=2050,
@@ -57,20 +57,22 @@ def parse_arguments():
                         help='path to the training list folder')
     parser.add_argument('--train-prefix', type=str, default='train',
                         help='prefix of the training files')
-    parser.add_argument('--key-path', type=str,
-                        default='/data3/floraxue/cs294/active-rl-data/machine_labels/cat_trial_0_unsure.p',
-                        help='key path for the unknown data set')
     parser.add_argument('--feat-dir', type=str,
                         default='/data3/floraxue/cs294/active-rl-data/data/feats/train/cat')
     parser.add_argument('--gt-path', type=str,
                         default='/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached.p')
     parser.add_argument('--val_rate', type=float, default=0.2)
     parser.add_argument('--test_rate', type=float, default=0.2)
+    parser.add_argument('--mode', type=str, default='rl')
+    parser.add_argument('--exp', type=str, default='')
+    parser.add_argument('--pretrained', type=str, default='')
 
     args = parser.parse_args()
     # global work_dir
     # work_dir = args.work_dirs
-
+    args.key_path = '/data3/floraxue/cs294/active-rl-data/cat_trial_0_unsure.p'
+    global exp
+    exp = args.exp
     return args
 
 
@@ -101,7 +103,7 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     return test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir)
 
 
-def test_all_data(category, i_episode):
+def test_all_data(category, i_episode, last_trial_key_path):
     """
     test to split the dataset
     :return:
@@ -109,8 +111,8 @@ def test_all_data(category, i_episode):
     trial = i_episode
     mode = 'RL'
     model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
-    last_trial_key_path = join(MACHINE_LABEL_DIR,
-                               '{}_trial_{}_unsure.p'.format(category, trial - 1))
+    # last_trial_key_path = join(MACHINE_LABEL_DIR,
+    #                            '{}_trial_{}_unsure.p'.format(category, trial - 1))
 
     test_all(last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
@@ -122,7 +124,10 @@ def train_nsq(args, game, q_func):
     num_actions = args.num_actions
 
     memory = ReplayMemory(args.buffer_size)
-    Q = q_func(input_dim, num_actions).to(device)
+    Q = q_func(input_dim, num_actions)
+    if args.pretrained != '':
+        Q.load_state_dict(torch.load(args.pretrained))
+    Q = Q.to(device)
     target_Q = q_func(input_dim, num_actions).to(device)
     # copy parameters of Q net to the target network
     target_Q.load_state_dict(Q.state_dict())
@@ -139,7 +144,7 @@ def train_nsq(args, game, q_func):
     # Pipeline params
     category = args.category
     # Set initial unsure key path
-    new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, 0))
+    new_key_path = args.key_path
 
     last_acc = 0
     for i_episode in range(1, args.episodes + 1):
@@ -162,27 +167,38 @@ def train_nsq(args, game, q_func):
         # feature as input. The hidden state is passed implicitly
         state = game.sample()
         state_seq, act_seq, reward_seq = [], [], []
-        next_state_seq, qvalue_seq, done_seq = [], [], []
+        next_state_seq, qvalue_seq, not_done_seq = [], [], []
         for t in count():
-            action, qvalue = robot.act(state)
-            # action, qvalue = random.randrange(num_actions), 0
+            if args.mode == 'rl':
+                action, qvalue = robot.act(state)
+                # logger.info('Qvalue {}'.format(qvalue))
+            elif args.mode == 'lsun':
+                action, qvalue = random.randrange(num_actions), 0
+            elif args.mode == 'unsure':
+                prob = state[-1]
+                if prob > 0.2 or prob < 0.8:
+                    action, qvalue = 1, 0
+                else:
+                    action, qvalue = 0, 0
+            else:
+                raise NotImplementedError
             _, next_state, done = game.step(action)
             state_seq += [state]
             act_seq += [action]
             next_state_seq += [next_state]
             qvalue_seq += [qvalue]
-            done_seq += [done]
+            not_done_seq += [1 - int(done)]
 
             if action > 0 and (game.chosen % game.duration == 0
                                or game.chosen == game.budget):
                 print("-------------{}/{}-------------".format(game.chosen, game.budget))
                 # Train the classifier
                 train_acc1, val_acc1 = game.train_model(train_mode='latest_RL',
-                                                        work_root='/data3/floraxue/cs294/active-rl-data/classifier',
+                                                        work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp),
                                                         lr=lr)
                 # select threshold
                 test_acc1 = game.test_model(test_mode='latest_RL',
-                                            work_root='/data3/floraxue/cs294/active-rl-data/classifier',
+                                            work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp),
                                             writer=writer,
                                             name=str(i_episode) + '/threshold',
                                             duration=game.update)
@@ -214,23 +230,26 @@ def train_nsq(args, game, q_func):
                     game.update, game.episode, game.current_reward))
                 reward_seq += [reward] * len(act_seq)
                 memory.push(state_seq, act_seq, next_state_seq,
-                            reward_seq, qvalue_seq, done_seq)
+                            reward_seq, qvalue_seq, not_done_seq)
                 state_seq, act_seq, reward_seq = [], [], []
-                next_state_seq, qvalue_seq, done_seq = [], [], []
+                next_state_seq, qvalue_seq, not_done_seq = [], [], []
 
                 # train agent
-                if len(memory) >= 5 * args.batch_size:
-                    logger.info('updating robot')
+                print(len(memory), args.batch_size, args.mode)
+                # import pdb; pdb.set_trace()
+                if len(memory) >= args.batch_size and (args.mode == 'rl'):
+                    logger.info('updating robot. memory buffer size: {}'.format(len(memory)))
                     _, _, next_state_batch, reward_batch, \
-                    qvalue_batch, not_done_batch = memory.sample(args.batch_size)
-                    robot.update(next_state_seq, reward_batch, qvalue_batch, not_done_batch)
+                    qvalue_batch, _ = memory.sample(args.batch_size)
+                    robot.update(next_state_seq, reward_batch, qvalue_batch, _,
+                                 work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp))
 
             state = next_state
 
             if done:
                 episode_durations.append(t + 1)
                 # propagate through the whole dataset and split
-                test_all_data(category, i_episode)
+                test_all_data(category, i_episode, new_key_path)
 
                 # Set new key path
                 new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))

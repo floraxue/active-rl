@@ -25,17 +25,17 @@ model_urls = {
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
-
+experiment_name = 'retrain-rl'
 env = Env()
 IMAGE_DIR_TRAIN = '/data3/floraxue/cs294/active-rl-data/data/images/train/cat'
 IMAGE_DIR_FIXED = '/data3/floraxue/cs294/active-rl-data/data/images/fixed/cat'
 IMAGE_DIR_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/data/images/holdout/cat'
 GT_PATH = '/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached.p'
 GT_PATH_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached_holdout.p'
-MACHINE_LABEL_DIR = '/data3/floraxue/cs294/active-rl-data/machine_labels'
-CLASSIFIER_ROOT = '/data3/floraxue/cs294/active-rl-data/classifier'
-CLASSIFIER_ROOT_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/classifier_holdout'
-MACHINE_LABEL_DIR_HOLDOUT = '/data3/floraxue/cs294/active-rl-data/machine_labels_holdout'
+MACHINE_LABEL_DIR = '/data3/floraxue/cs294/exp/{0}/machine_labels'.format(experiment_name)
+CLASSIFIER_ROOT = '/data3/floraxue/cs294/exp/{0}/classifier'.format(experiment_name)
+CLASSIFIER_ROOT_HOLDOUT = '/data3/floraxue/cs294/exp/{0}/classifier_holdout'.format(experiment_name)
+MACHINE_LABEL_DIR_HOLDOUT = '/data3/floraxue/cs294/exp/{0}/machine_labels_holdout'.format(experiment_name)
 
 # Default args
 CROP_SIZE = 224
@@ -572,8 +572,8 @@ def test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir
     pos_thresh = split_info['posThresh']
     neg_thresh = split_info['negThresh']
 
-    # pos_thresh = 0.98
-    # neg_thresh = 0.02
+    # pos_thresh = 0.95
+    # neg_thresh = 0.05
 
     prec1, scores, keys, labels = validate(
         PRINT_FREQ, test_loader, model, criterion, _iter, for_test=True)

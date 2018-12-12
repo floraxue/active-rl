@@ -11,7 +11,9 @@ pos_reads = []
 pos_corrects = []
 neg_reads = []
 neg_corrects = []
-for trial in range(1,5):
+print('trial', 'pos_reads', 'pos_corrects', 'neg_reads', 'neg_corrects', 'corrects', 'acc')
+
+for trial in range(1,8):
 
     pos_path = join(MACHINE_ROOT, 'cat_trial_{}_pos.txt'.format(trial))
     neg_path = join(MACHINE_ROOT, 'cat_trial_{}_neg.txt'.format(trial))
@@ -52,10 +54,13 @@ for trial in range(1,5):
     pos_corrects.append(pos_correct)
     neg_reads.append(neg_read)
     neg_corrects.append(neg_correct)
+    print(trial, pos_read, pos_correct, neg_read, neg_correct, correct, acc)
+
 
 all_correct = np.sum(corrects)
 all_reads = np.sum(pos_reads) + np.sum(neg_reads)
 
+print("Final result")
 print("acc", all_correct / all_reads)
 print("pos all", np.sum(pos_reads))
 print("pos correct", np.sum(pos_corrects))

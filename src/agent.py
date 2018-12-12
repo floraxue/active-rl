@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import os
 import numpy as np
 import random
-
+import shutil
 
 class NSQ(object):
     """
@@ -45,9 +45,9 @@ class NSQ(object):
         eps_threshold = self.explorer.value(self.t)
 
         state = torch.from_numpy(state).unsqueeze(0).cuda()
-        qvalue, hidden_unit = self.q_function(state)
+        qvalue = self.q_function(state)
         if sample > eps_threshold:
-            action_index = torch.argmax(qvalue)
+            action_index = torch.argmax(qvalue).item()
         else:
             action_index = random.randrange(self.num_actions)
 
@@ -55,7 +55,7 @@ class NSQ(object):
         return action_index, qvalue
 
     def update(self, next_state_batch, past_rewards, past_action_values,
-               not_done_mask):
+               not_done_mask, work_root):
         """
 
         different from the asynchronous n-step q learning,
@@ -63,9 +63,11 @@ class NSQ(object):
         """
 
         # gather the last q values
-        with torch.no_grad:
+        next_state_batch = torch.FloatTensor(next_state_batch).cuda()
+        with torch.no_grad():
             next_max_q = self.target_q_function(next_state_batch).max(1)[0]
-            R = not_done_mask * next_max_q
+            # R = not_done_mask * next_max_q
+            R = next_max_q
 
         bsz = next_state_batch.size(0)
         loss = torch.zeros(bsz)
@@ -86,5 +88,8 @@ class NSQ(object):
         for param in self.q_function.parameters():
             param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
+
+        #save state_dict
+        torch.save(self.q_function.state_dict, os.path.join(work_root, 'agent_state_dict.pth'))
 
 
