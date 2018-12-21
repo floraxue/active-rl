@@ -16,6 +16,7 @@ import shutil
 import torch.nn.functional as F
 import numpy as np
 import json
+from util import checkdir
 import pickle
 
 model_urls = {
@@ -25,7 +26,7 @@ model_urls = {
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
-experiment_name = 'retrain-rl'
+experiment_name = 'rl-saveagent'
 env = Env()
 IMAGE_DIR_TRAIN = '/data3/floraxue/cs294/active-rl-data/data/images/train/cat'
 IMAGE_DIR_FIXED = '/data3/floraxue/cs294/active-rl-data/data/images/fixed/cat'
@@ -45,7 +46,7 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 1e-4
 PRINT_FREQ = 10
 EVAL_EVERY = 1000
-
+USE_PRETRAINED = True
 
 # def args_parser():
 #     parser = argparse.ArgumentParser(description='Pytorch training')
@@ -103,11 +104,11 @@ def train(train_keys_path, val_keys_path, save_dir, method, category, iters,
     model = torch.nn.DataParallel(model).to(device)
 
     # NEW load state_dict
-    model_path = join(model_file_dir, 'bal_model_best.pth.tar')
+    model_path = join(model_file_dir, 'bal_model_best.prth.tar')
     if exists(model_path):
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['state_dict'])
-    else:
+    elif USE_PRETRAINED:
         checkpoint = model_zoo.load_url(model_urls['resnet18'])
         checkpoint.pop('fc.weight')
         checkpoint.pop('fc.bias')
@@ -692,7 +693,7 @@ def test_all(last_trial_key_path, trial, method, category, model_file_dir):
     # Write to file
     split_keys = [[] for _ in range(3)]
     split_gts = [[] for _ in range(3)]
-    out_pos_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_pos.txt'.format(category, trial))
+    out_pos_path = join(checkdir(MACHINE_LABEL_DIR), '{}_trial_{}_pos.txt'.format(category, trial))
     out_unsure_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.txt'.format(category, trial))
     out_unsure_pickle = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))
     out_neg_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_neg.txt'.format(category, trial))

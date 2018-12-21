@@ -5,6 +5,7 @@ import numpy as np
 import os
 import math
 from network import MLP
+import torch.nn.functional as F
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -21,7 +22,7 @@ class PolicyNet(nn.Module):
         # feature dimension reduction
         self.conv = nn.Conv2d(in_size, feat_size, kernel_size=1, bias=False)
         self.bn = nn.BatchNorm2d(feat_size)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.rnn = nn.LSTM(feat_size, hidden_size, num_layers=nlayers,
                            batch_first=True)
         self.proj = nn.Conv2d(hidden_size, feat_size * hidden_size,

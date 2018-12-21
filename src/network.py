@@ -13,8 +13,8 @@ class MLP(nn.Module):
     def __init__(self, in_dim=2050, out_dim=2):
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(in_dim, 128)
-        self.relu = nn.ReLU(inplace=True)
-        self.drop = nn.Dropout(p=0.5, inplace=True)
+        self.relu = nn.ReLU(inplace=False)
+        self.drop = nn.Dropout(p=0.5, inplace=False)
         self.fc2 = nn.Linear(128, out_dim)
 
         for m in self.modules():

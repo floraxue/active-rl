@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 
 
-MACHINE_ROOT = '/data3/floraxue/cs294/active-rl-data/machine_labels'
+MACHINE_ROOT = '/data3/floraxue/cs294/exp/lsun_pretrained/machine_labels'
 
 accs = []
 corrects = []
@@ -11,13 +11,13 @@ pos_reads = []
 pos_corrects = []
 neg_reads = []
 neg_corrects = []
-print('trial', 'pos_reads', 'pos_corrects', 'neg_reads', 'neg_corrects', 'corrects', 'acc')
+print('trial', 'pos_reads', 'neg_reads', 'unsure', 'pos_corrects', 'neg_corrects', 'corrects', 'acc')
 
-for trial in range(1,8):
+for trial in range(1,6):
 
     pos_path = join(MACHINE_ROOT, 'cat_trial_{}_pos.txt'.format(trial))
     neg_path = join(MACHINE_ROOT, 'cat_trial_{}_neg.txt'.format(trial))
-
+    unsure_path = join(MACHINE_ROOT, 'cat_trial_{}_unsure.txt'.format(trial))
     GT_PATH = '/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached.p'
 
     dic = pickle.load(open(GT_PATH, 'rb'))
@@ -46,6 +46,10 @@ for trial in range(1,8):
                 correct += 1
                 neg_correct += 1
 
+    with open(unsure_path, 'r') as fp:
+        lines = fp.readlines()
+        total = len(lines)
+
     acc = correct / (pos_read + neg_read)
 
     accs.append(acc)
@@ -54,7 +58,7 @@ for trial in range(1,8):
     pos_corrects.append(pos_correct)
     neg_reads.append(neg_read)
     neg_corrects.append(neg_correct)
-    print(trial, pos_read, pos_correct, neg_read, neg_correct, correct, acc)
+    print(trial, pos_read,  neg_read, total, pos_correct,neg_correct, correct, acc)
 
 
 all_correct = np.sum(corrects)

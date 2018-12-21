@@ -18,15 +18,16 @@ from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 from train_new import test_fixed_set, test_all
 import random
 from tensorboardX import SummaryWriter
+import torch.nn.functional as F
 
-writer = SummaryWriter('runs/')
+writer = SummaryWriter('runs-rl-saveagent/')
 exp = ''
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
     parser.add_argument('--category', type=str, default='cat',
                         help='image category')
-    parser.add_argument('--budget', type=int, default=100,
+    parser.add_argument('--budget', type=int, default=1000,
                         help='maximum number of examples for human annotation')
     parser.add_argument('--eps-start', type=float, default=0.9,
                         help='starting epsilon')
@@ -36,9 +37,9 @@ def parse_arguments():
                         help='decay steps')
     parser.add_argument('--gamma', type=float, default=0.999,
                         help='discount factor')
-    parser.add_argument('--duration', '-k', type=int, default=20,
+    parser.add_argument('--duration', '-k', type=int, default=25,
                         help='get reward every k steps')
-    parser.add_argument('--batch-size', type=int, default=1,
+    parser.add_argument('--batch-size', type=int, default=4,
                         help='batch size')
     parser.add_argument('--target-update', '-T', type=int, default=1000,
                         help='update target network every T steps')
@@ -71,6 +72,7 @@ def parse_arguments():
     # global work_dir
     # work_dir = args.work_dirs
     args.key_path = '/data3/floraxue/cs294/active-rl-data/cat_trial_0_unsure.p'
+    # args.key_path = '/data3/floraxue/cs294/active-rl-data/cat_trial_0_unsure_holdout.p'
     global exp
     exp = args.exp
     return args
@@ -187,6 +189,7 @@ def train_nsq(args, game, q_func):
             act_seq += [action]
             next_state_seq += [next_state]
             qvalue_seq += [qvalue]
+
             not_done_seq += [1 - int(done)]
 
             if action > 0 and (game.chosen % game.duration == 0
@@ -229,19 +232,21 @@ def train_nsq(args, game, q_func):
                 logger.info('current reward in update {} of episode {} is {}'.format(
                     game.update, game.episode, game.current_reward))
                 reward_seq += [reward] * len(act_seq)
+
                 memory.push(state_seq, act_seq, next_state_seq,
                             reward_seq, qvalue_seq, not_done_seq)
                 state_seq, act_seq, reward_seq = [], [], []
                 next_state_seq, qvalue_seq, not_done_seq = [], [], []
 
                 # train agent
-                print(len(memory), args.batch_size, args.mode)
-                # import pdb; pdb.set_trace()
-                if len(memory) >= args.batch_size and (args.mode == 'rl'):
+                if len(memory) >= 2*args.batch_size and (args.mode == 'rl') and (args.pretrained == ''):
                     logger.info('updating robot. memory buffer size: {}'.format(len(memory)))
-                    _, _, next_state_batch, reward_batch, \
-                    qvalue_batch, _ = memory.sample(args.batch_size)
-                    robot.update(next_state_seq, reward_batch, qvalue_batch, _,
+
+                    #TODO need to be fixed
+                    for x in range(args.batch_size):
+                        _, _, next_state_batch, reward_batch, \
+                        qvalue_batch, _ = memory.sample(1)
+                        robot.update(next_state_batch, reward_batch, qvalue_batch, _,
                                  work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp))
 
             state = next_state

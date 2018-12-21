@@ -46,6 +46,7 @@ class NSQ(object):
 
         state = torch.from_numpy(state).unsqueeze(0).cuda()
         qvalue = self.q_function(state)
+
         if sample > eps_threshold:
             action_index = torch.argmax(qvalue).item()
         else:
@@ -64,25 +65,26 @@ class NSQ(object):
 
         # gather the last q values
         next_state_batch = torch.FloatTensor(next_state_batch).cuda()
+        past_rewards = torch.FloatTensor(past_rewards).cuda()
+        past_action_values = torch.cat(past_action_values).max(1)[0]
+
         with torch.no_grad():
             next_max_q = self.target_q_function(next_state_batch).max(1)[0]
             # R = not_done_mask * next_max_q
             R = next_max_q
 
         bsz = next_state_batch.size(0)
-        loss = torch.zeros(bsz)
-        duration = past_rewards.size(1)
+        loss = 0
+        duration = past_rewards.size(0)
         for i in reversed(range(duration)):
             R *= self.gamma
-            R += past_rewards[:, i]
-            current_q = past_action_values[:, i]
-            loss += F.smooth_l1_loss(current_q, R)
+            R += past_rewards
+            loss += F.smooth_l1_loss(past_action_values, R.clone())
 
         loss /= duration
         average_loss = loss.mean()
-
         self.optimizer.zero_grad()
-        average_loss.backward()
+        average_loss.backward(retain_graph = True)
 
         # gradient clipping
         for param in self.q_function.parameters():
@@ -90,6 +92,6 @@ class NSQ(object):
         self.optimizer.step()
 
         #save state_dict
-        torch.save(self.q_function.state_dict, os.path.join(work_root, 'agent_state_dict.pth'))
+        torch.save(self.q_function.state_dict(), os.path.join(work_root, 'agent_state_dict.pth'))
 
 
