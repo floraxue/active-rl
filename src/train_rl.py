@@ -14,14 +14,13 @@ from buffer import ReplayMemory
 from game import VFGGAME
 from explorer import Explorer
 from util import logger
-from train_new import MACHINE_LABEL_DIR, CLASSIFIER_ROOT
 from train_new import test_fixed_set, test_all
 import random
 from tensorboardX import SummaryWriter
-import torch.nn.functional as F
+from path_constants import *
 
 writer = SummaryWriter('runs-rl-saveagent/')
-exp = ''
+# exp = 'rl-train'
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="training N-step Q learning")
@@ -58,23 +57,38 @@ def parse_arguments():
                         help='path to the training list folder')
     parser.add_argument('--train-prefix', type=str, default='train',
                         help='prefix of the training files')
-    parser.add_argument('--feat-dir', type=str,
-                        default='/data3/floraxue/cs294/active-rl-data/data/feats/train/cat')
-    parser.add_argument('--gt-path', type=str,
-                        default='/data3/floraxue/cs294/active-rl-data/ground_truth/cat_gt_cached.p')
+    # parser.add_argument('--feat-dir', type=str,
+    #                     default='/data3/floraxue/cs294/active-rl-data/data/feats/train/cat')
+    # parser.add_argument('--gt-path', type=str)
+    # parser.add_argument('--image-dir', type=str)
     parser.add_argument('--val_rate', type=float, default=0.2)
     parser.add_argument('--test_rate', type=float, default=0.2)
-    parser.add_argument('--mode', type=str, default='rl')
-    parser.add_argument('--exp', type=str, default='')
+    parser.add_argument('--mode', type=str, default='rl',
+                        help='Sampling policy. '
+                             'Should be one of rl, random or uncertainty')
+    # parser.add_argument('--exp', type=str, default='')
     parser.add_argument('--pretrained', type=str, default='')
 
     args = parser.parse_args()
-    # global work_dir
-    # work_dir = args.work_dirs
-    args.key_path = '/data3/floraxue/cs294/active-rl-data/cat_trial_0_unsure.p'
-    # args.key_path = '/data3/floraxue/cs294/active-rl-data/cat_trial_0_unsure_holdout.p'
-    global exp
-    exp = args.exp
+    # global exp
+    # exp = args.exp
+    # logger.info("Running exp {}".format(exp))
+    if args.pretrained == '' and args.mode == 'rl':
+        # not pretrained, so use train set
+        args.key_path = UNSURE_KEY_PATH
+        args.feat_dir = FEAT_DIR_TRAIN
+        args.gt_path = GT_PATH
+        args.image_dir = IMAGE_DIR_TRAIN
+        args.initial_train_keys_path = INITIAL_TRIAL_KEY_PATH
+        args.classifier_root = CLASSIFIER_ROOT
+    elif args.pretrained != '':
+        args.key_path = UNSURE_KEY_PATH_HOLDOUT
+        args.feat_dir = FEAT_DIR_HOLDOUT
+        args.gt_path = GT_PATH_HOLDOUT
+        args.image_dir = IMAGE_DIR_HOLDOUT
+        args.initial_train_keys_path = INITIAL_TRIAL_KEY_PATH_HOLDOUT
+        args.classifier_root = CLASSIFIER_ROOT_HOLDOUT
+
     return args
 
 
@@ -100,46 +114,46 @@ def fixed_set_evaluation(category, mode, i_episode, update):
     """
     test_keys_path = '/data3/floraxue/cs294/active-rl-data/pool/{}_fixed_keys.p'.format(category)
     method = 'resnet'
-    model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
+    model_file_dir = join(CLASSIFIER_ROOT, 'snapshots')
     test_prefix = '{}_{}_episode_{:04d}_update_{:03d}'.format(mode, category, i_episode, update)
     return test_fixed_set(test_keys_path, method, category, test_prefix, model_file_dir)
 
 
-def test_all_data(category, i_episode, last_trial_key_path):
+def test_all_data(category, i_episode, last_trial_key_path, is_holdout):
     """
     test to split the dataset
     :return:
     """
     trial = i_episode
-    mode = 'RL'
-    model_file_dir = join(CLASSIFIER_ROOT, 'latest_{}'.format(mode), 'snapshots')
-    # last_trial_key_path = join(MACHINE_LABEL_DIR,
-    #                            '{}_trial_{}_unsure.p'.format(category, trial - 1))
+    model_file_dir = join(CLASSIFIER_ROOT, 'snapshots')
+    image_dir = IMAGE_DIR_HOLDOUT if is_holdout else IMAGE_DIR_TRAIN
+    gt_path = GT_PATH_HOLDOUT if is_holdout else GT_PATH
+    test_all(last_trial_key_path, trial, 'resnet', category, model_file_dir,
+             image_dir, gt_path)
 
-    test_all(last_trial_key_path, trial, 'resnet', 'cat', model_file_dir)
 
-
-def train_nsq(args, game, q_func):
+def run_pipeline(args, game):
     # build model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     input_dim = args.input_dim
     num_actions = args.num_actions
+    is_holdout = (args.pretrained != '')
 
-    memory = ReplayMemory(args.buffer_size)
-    Q = q_func(input_dim, num_actions)
-    if args.pretrained != '':
-        Q.load_state_dict(torch.load(args.pretrained))
-    Q = Q.to(device)
-    target_Q = q_func(input_dim, num_actions).to(device)
-    # copy parameters of Q net to the target network
-    target_Q.load_state_dict(Q.state_dict())
+    if args.mode == 'rl':
+        memory = ReplayMemory(args.buffer_size)
+        q_func = NewPolicyNet
+        Q = q_func(input_dim, num_actions)
+        if args.pretrained != '':
+            Q.load_state_dict(torch.load(args.pretrained))
+        Q = Q.to(device)
+        target_Q = q_func(input_dim, num_actions).to(device)
 
-    optimizer = optim.RMSprop(Q.parameters())
+        optimizer = optim.RMSprop(Q.parameters())
 
-    expr = Explorer(args.eps_start, args.eps_end, decay_steps=args.decay_steps)
+        expr = Explorer(args.eps_start, args.eps_end, decay_steps=args.decay_steps)
 
-    robot = NSQ(Q, target_Q, optimizer, expr,
-                gamma=args.gamma, num_actions=num_actions)
+        robot = NSQ(Q, target_Q, optimizer, expr,
+                    gamma=args.gamma, num_actions=num_actions)
 
     episode_durations = []
 
@@ -148,7 +162,6 @@ def train_nsq(args, game, q_func):
     # Set initial unsure key path
     new_key_path = args.key_path
 
-    last_acc = 0
     for i_episode in range(1, args.episodes + 1):
         lr = adjust_learning_rate(i_episode)
         game.reset(new_key_path)
@@ -174,9 +187,10 @@ def train_nsq(args, game, q_func):
             if args.mode == 'rl':
                 action, qvalue = robot.act(state)
                 # logger.info('Qvalue {}'.format(qvalue))
-            elif args.mode == 'lsun':
+            elif args.mode == 'random':
                 action, qvalue = random.randrange(num_actions), 0
-            elif args.mode == 'unsure':
+            elif args.mode == 'uncertainty':
+                # TODO uncertainty sampling not in use right now
                 prob = state[-1]
                 if prob > 0.2 or prob < 0.8:
                     action, qvalue = 1, 0
@@ -196,70 +210,65 @@ def train_nsq(args, game, q_func):
                                or game.chosen == game.budget):
                 print("-------------{}/{}-------------".format(game.chosen, game.budget))
                 # Train the classifier
-                train_acc1, val_acc1 = game.train_model(train_mode='latest_RL',
-                                                        work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp),
-                                                        lr=lr)
+                train_acc1, val_acc1 = game.train_model(lr=lr, is_holdout=is_holdout)
                 # select threshold
-                test_acc1 = game.test_model(test_mode='latest_RL',
-                                            work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp),
-                                            writer=writer,
-                                            name=str(i_episode) + '/threshold',
-                                            duration=game.update)
-                # Evaluate on fixed set
-                fix_acc1, fix_sure_acc1 = fixed_set_evaluation(category, 'RL', i_episode, game.update)
-                writer.add_scalars(str(i_episode) + '/accuracy', {
-                    'train_acc1': train_acc1,
-                    'val_acc1': val_acc1,
-                    'test_acc1': test_acc1,
-                    'fix_acc1': fix_acc1,
-                    'fix_sure_acc1': fix_sure_acc1*100},
-                                   game.update)
+                test_acc1 = game.test_model(writer=writer,
+                                            writer_name=str(i_episode) + '/threshold',
+                                            duration=game.update,
+                                            is_holdout=is_holdout)
+                if not is_holdout:
+                    # Evaluate on fixed set
+                    fix_acc1, fix_sure_acc1 = fixed_set_evaluation(category, 'RL', i_episode, game.update)
+                    writer.add_scalars(str(i_episode) + '/accuracy', {
+                        'train_acc1': train_acc1,
+                        'val_acc1': val_acc1,
+                        'test_acc1': test_acc1,
+                        'fix_acc1': fix_acc1,
+                        'fix_sure_acc1': fix_sure_acc1*100},
+                                       game.update)
+                else:
+                    writer.add_scalars(str(i_episode) + '/accuracy', {
+                        'train_acc1': train_acc1,
+                        'val_acc1': val_acc1,
+                        'test_acc1': test_acc1},
+                                       game.update)
 
                 writer.add_scalar(str(i_episode) + '/lr', lr, game.update)
 
-                # train_lsun_model(game, 'latest_LSUN', '/data3/floraxue/cs294/active-rl-data/classifier')
-                # test_lsun_model('latest_LSUN', '/data3/floraxue/cs294/active-rl-data/classifier')
+                if args.mode == 'rl' and not is_holdout:
+                    # Read reward from difference from LSUN
+                    reward = calculate_reward(category, i_episode, game.update)
+                    game.current_reward = reward
+                    writer.add_scalar(str(i_episode) + '/reward', reward, game.update)
+                    logger.info('current reward in update {} of episode {} is {}'.format(
+                        game.update, game.episode, game.current_reward))
+                    reward_seq += [reward] * len(act_seq)
 
-                # Keep track of the place where last duration left off
-                # game.last = game.index
-
-                # fixed_set_evaluation(category, 'LSUN', i_episode, game.update)
-
-                # Read reward from difference from LSUN
-                reward = calculate_reward(category, i_episode, game.update)
-                game.current_reward = reward
-                writer.add_scalar(str(i_episode) + '/reward', reward, game.update)
-                logger.info('current reward in update {} of episode {} is {}'.format(
-                    game.update, game.episode, game.current_reward))
-                reward_seq += [reward] * len(act_seq)
-
-                memory.push(state_seq, act_seq, next_state_seq,
-                            reward_seq, qvalue_seq, not_done_seq)
+                    memory.push(state_seq, act_seq, next_state_seq,
+                                reward_seq, qvalue_seq, not_done_seq)
                 state_seq, act_seq, reward_seq = [], [], []
                 next_state_seq, qvalue_seq, not_done_seq = [], [], []
 
                 # train agent
-                if len(memory) >= 2*args.batch_size and (args.mode == 'rl') and (args.pretrained == ''):
+                if len(memory) >= 2*args.batch_size \
+                        and (args.mode == 'rl') and not is_holdout:
                     logger.info('updating robot. memory buffer size: {}'.format(len(memory)))
-
-                    #TODO need to be fixed
                     for x in range(args.batch_size):
-                        _, _, next_state_batch, reward_batch, \
-                        qvalue_batch, _ = memory.sample(1)
+                        _, _, next_state_batch, reward_batch, qvalue_batch, _ = memory.sample(1)
                         robot.update(next_state_batch, reward_batch, qvalue_batch, _,
-                                 work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp))
+                                     work_root='/data3/floraxue/cs294/exp/{0}/classifier'.format(args.exp))
 
             state = next_state
 
             if done:
                 episode_durations.append(t + 1)
                 # propagate through the whole dataset and split
-                test_all_data(category, i_episode, new_key_path)
+                test_all_data(category, i_episode, new_key_path, is_holdout)
 
                 # Set new key path
                 new_key_path = join(MACHINE_LABEL_DIR, '{}_trial_{}_unsure.p'.format(category, trial))
-                robot.target_q_function.load_state_dict(
-                    robot.q_function.state_dict())
+                if args.mode == 'rl':
+                    robot.target_q_function.load_state_dict(robot.q_function.state_dict())
                 break
 
 
@@ -278,8 +287,7 @@ def adjust_learning_rate(iter):
 def main():
     args = parse_arguments()
     game = VFGGAME(args)
-    q_func = NewPolicyNet
-    train_nsq(args, game, q_func)
+    run_pipeline(args, game)
 
 
 if __name__ == '__main__':
